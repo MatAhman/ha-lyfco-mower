@@ -1,0 +1,54 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Anslut till Lyfco robotgräsklippare",
+        "description": "Klipparen måste vara ansluten till samma lokala nätverk som Home Assistant.",
+        "data": {"host": "IP-adress eller värdnamn"}
+      }
+    },
+    "error": {
+      "cannot_connect": "Kunde inte ansluta eller få ett giltigt statussvar.",
+      "invalid_host": "Ange en IP-adress eller ett värdnamn."
+    },
+    "abort": {"already_configured": "Den här klipparen är redan konfigurerad."}
+  },
+  "entity": {
+    "sensor": {
+      "runtime_hours": {"name": "Total klipptid"},
+      "charge_hours": {"name": "Total laddtid"},
+      "voltage": {"name": "Maskinspänning"},
+      "active_alarms": {"name": "Antal aktiva larm"},
+      "firmware": {"name": "Firmware"}
+    },
+    "binary_sensor": {
+      "alarm_boundary_wire_broken": {"name": "Kantledningen är bruten"},
+      "alarm_charging_station_no_power": {"name": "Ingen ström till laddstationen"},
+      "alarm_low_battery": {"name": "Låg batteriladdning"},
+      "alarm_left_wheel_motor_overload": {"name": "Vänster körmotor överbelastad"},
+      "alarm_right_wheel_motor_overload": {"name": "Höger körmotor överbelastad"},
+      "alarm_blade_motor_overload": {"name": "Klippmotor överbelastad"},
+      "alarm_lift_pressure_sensor_1": {"name": "Lyft-/trycksensor 1"},
+      "alarm_lift_pressure_sensor_2": {"name": "Lyft-/trycksensor 2"},
+      "alarm_lift_pressure_sensor_3": {"name": "Lyft-/trycksensor 3"},
+      "alarm_handle_sensor": {"name": "Handtagssensor aktiverad"},
+      "alarm_mower_tilted": {"name": "Klipparen har vält"},
+      "alarm_wire_signal_lost": {"name": "Trådsignal förlorad"},
+      "alarm_outside_boundary": {"name": "Utanför kanttråd"},
+      "alarm_mower_stuck": {"name": "Klipparen har fastnat"}
+    },
+    "button": {
+      "start_auto": {"name": "Starta automatiskt"},
+      "go_home": {"name": "Åk till laddstation"},
+      "stop": {"name": "Stopp"},
+      "manual_mode": {"name": "Aktivera manuellt läge"},
+      "manual_forward": {"name": "Kör framåt"},
+      "manual_reverse": {"name": "Kör bakåt"},
+      "manual_left": {"name": "Sväng vänster"},
+      "manual_right": {"name": "Sväng höger"}
+    },
+    "switch": {
+      "blade": {"name": "Klippkniv"}
+    }
+  }
+}

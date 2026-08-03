@@ -1,0 +1,54 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Lyfco robot mower",
+        "description": "The mower must be connected to the same local network as Home Assistant.",
+        "data": {"host": "IP address or hostname"}
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect or receive a valid status response.",
+      "invalid_host": "Enter an IP address or hostname."
+    },
+    "abort": {"already_configured": "This mower is already configured."}
+  },
+  "entity": {
+    "sensor": {
+      "runtime_hours": {"name": "Total mowing time"},
+      "charge_hours": {"name": "Total charging time"},
+      "voltage": {"name": "Machine voltage"},
+      "active_alarms": {"name": "Active alarm count"},
+      "firmware": {"name": "Firmware"}
+    },
+    "binary_sensor": {
+      "alarm_boundary_wire_broken": {"name": "Boundary wire broken"},
+      "alarm_charging_station_no_power": {"name": "Charging station has no power"},
+      "alarm_low_battery": {"name": "Low battery"},
+      "alarm_left_wheel_motor_overload": {"name": "Left wheel motor overloaded"},
+      "alarm_right_wheel_motor_overload": {"name": "Right wheel motor overloaded"},
+      "alarm_blade_motor_overload": {"name": "Blade motor overloaded"},
+      "alarm_lift_pressure_sensor_1": {"name": "Lift/pressure sensor 1"},
+      "alarm_lift_pressure_sensor_2": {"name": "Lift/pressure sensor 2"},
+      "alarm_lift_pressure_sensor_3": {"name": "Lift/pressure sensor 3"},
+      "alarm_handle_sensor": {"name": "Handle sensor active"},
+      "alarm_mower_tilted": {"name": "Mower tilted"},
+      "alarm_wire_signal_lost": {"name": "Wire signal lost"},
+      "alarm_outside_boundary": {"name": "Outside boundary"},
+      "alarm_mower_stuck": {"name": "Mower stuck"}
+    },
+    "button": {
+      "start_auto": {"name": "Start automatically"},
+      "go_home": {"name": "Return to charger"},
+      "stop": {"name": "Stop"},
+      "manual_mode": {"name": "Enable manual mode"},
+      "manual_forward": {"name": "Drive forward"},
+      "manual_reverse": {"name": "Drive reverse"},
+      "manual_left": {"name": "Turn left"},
+      "manual_right": {"name": "Turn right"}
+    },
+    "switch": {
+      "blade": {"name": "Cutting blade"}
+    }
+  }
+}
