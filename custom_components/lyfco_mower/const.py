@@ -9,7 +9,7 @@ DEFAULT_NAME = "Lyfco Robot Mower"
 DEFAULT_PORT = 9600
 POLL_INTERVAL = timedelta(seconds=30)
 
-PLATFORMS = ["sensor", "binary_sensor", "button", "lawn_mower", "switch"]
+PLATFORMS = ["sensor", "binary_sensor", "button", "lawn_mower", "text", "switch"]
 
 ALARM_KEYS = (
     "boundary_wire_broken",

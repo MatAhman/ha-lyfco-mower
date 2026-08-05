@@ -67,6 +67,14 @@ SENSORS = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda status: status.firmware,
     ),
+    LyfcoSensorDescription(
+        key="working_areas",
+        translation_key="working_areas",
+        icon="mdi:map-marker-radius-outline",
+        value_fn=lambda status: sum(area.enabled for area in status.areas)
+        if status.areas
+        else None,
+    ),
 )
 
 
@@ -96,6 +104,14 @@ class LyfcoSensor(LyfcoEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, object] | None:
-        if self.entity_description.key != "active_alarms":
-            return None
-        return {"active_alarm_keys": list(self.coordinator.data.active_alarm_keys)}
+        if self.entity_description.key == "active_alarms":
+            return {"active_alarm_keys": list(self.coordinator.data.active_alarm_keys)}
+        if self.entity_description.key == "working_areas":
+            return {
+                f"area_{area.number}": {
+                    "located": area.located,
+                    "enabled": area.enabled,
+                }
+                for area in self.coordinator.data.areas
+            }
+        return None

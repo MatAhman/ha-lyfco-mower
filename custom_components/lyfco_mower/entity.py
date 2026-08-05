@@ -23,6 +23,7 @@ class LyfcoEntity(CoordinatorEntity[LyfcoCoordinator]):
             identifiers={(DOMAIN, host)},
             name=DEFAULT_NAME,
             manufacturer="Lyfco",
-            model="Robotgräsklippare (lokalt LAN-protokoll)",
+            model=self.coordinator.data.model
+            or "Robotgräsklippare (lokalt LAN-protokoll)",
             sw_version=self.coordinator.data.firmware,
         )

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import datetime
 import logging
 import time
 
@@ -16,6 +17,9 @@ VSP_HEADER_SIZE = 20
 CONNECT_TIMEOUT = 10.0
 RESPONSE_TIMEOUT = 6.0
 HEARTBEAT_INTERVAL = 5.0
+EXTENDED_REFRESH_INTERVAL = 300.0
+INCOMPLETE_REFRESH_INTERVAL = 30.0
+EXTENDED_RESPONSE_TIMEOUT = 2.5
 
 
 class LyfcoError(Exception):
@@ -31,6 +35,49 @@ class LyfcoProtocolError(LyfcoError):
 
 
 @dataclass(frozen=True, slots=True)
+class MowerArea:
+    """One configured working area."""
+
+    number: int
+    located: bool
+    enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
+class MowerSchedule:
+    """Read-only schedule for one weekday (0=Sunday)."""
+
+    day: int
+    edge_mowing: bool
+    start_time: str
+    area_minutes: tuple[int, int, int, int, int, int]
+
+
+@dataclass(frozen=True, slots=True)
+class MowerConfiguration:
+    """Configuration returned by the mower's F command."""
+
+    mower_address: int
+    language_code: int
+    range_level: int
+    ultrasonic_sensor: bool
+    rain_sensor: bool
+    touch_sensor: bool
+    pressure_sensor: bool
+    compass: bool
+    audible_alarm: bool
+
+    def as_body(self) -> str:
+        """Encode the complete F body, preserving every configuration field."""
+        return (
+            f"{self.mower_address:02d}{self.language_code:02d}{self.range_level}"
+            f"{int(self.ultrasonic_sensor)}{int(self.rain_sensor)}"
+            f"{int(self.touch_sensor)}{int(self.pressure_sensor)}"
+            f"{int(self.compass)}{int(self.audible_alarm)}"
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class MowerStatus:
     """Decoded status returned by the mower."""
 
@@ -39,6 +86,10 @@ class MowerStatus:
     voltage: float
     alarm_flags: tuple[bool, ...]
     firmware: str | None = None
+    model: str | None = None
+    configuration: MowerConfiguration | None = None
+    areas: tuple[MowerArea, ...] = ()
+    schedules: tuple[MowerSchedule, ...] = ()
 
     @property
     def active_alarm_keys(self) -> tuple[str, ...]:
@@ -125,7 +176,11 @@ def _extract_uart(message: str) -> str | None:
     return data[:length]
 
 
-def parse_status(command: str, firmware: str | None = None) -> MowerStatus:
+def parse_status(
+    command: str,
+    firmware: str | None = None,
+    model: str | None = None,
+) -> MowerStatus:
     """Parse the W response used by app version 6.2.1."""
     if not verify_command(command) or command[4:5] != "W":
         raise LyfcoProtocolError("Invalid status response")
@@ -141,6 +196,90 @@ def parse_status(command: str, firmware: str | None = None) -> MowerStatus:
         voltage=int(body[10:14]) / 100.0,
         alarm_flags=flags,
         firmware=firmware,
+        model=model,
+    )
+
+
+def parse_search_ack(message: str) -> tuple[str | None, str | None]:
+    """Extract only model and firmware; never retain credential fields."""
+    if not message.startswith("CodeName=SearchAck"):
+        return None, None
+    fields: dict[str, str] = {}
+    for item in message.split("&"):
+        if "=" not in item:
+            continue
+        key, value = item.split("=", 1)
+        if key in {"DevName", "ByName"}:
+            fields[key] = value
+    device_name = fields.get("DevName", "")
+    model = fields.get("ByName") or device_name.split("_", 1)[0] or None
+    firmware = device_name.split("_", 1)[1] if "_" in device_name else None
+    return model, firmware
+
+
+def parse_area(command: str) -> MowerArea:
+    """Parse one verified R working-area record."""
+    if not verify_command(command) or command[4:5] != "R":
+        raise LyfcoProtocolError("Invalid working-area response")
+    declared_length = int(command[2:4])
+    body = command[5 : declared_length - 2]
+    if len(body) != 3 or not body.isdigit() or body[0] not in "123456":
+        raise LyfcoProtocolError("Unsupported working-area response")
+    return MowerArea(
+        number=int(body[0]),
+        located=body[1] == "1",
+        enabled=body[2] == "1",
+    )
+
+
+def parse_configuration(command: str) -> MowerConfiguration:
+    """Parse one verified F configuration response."""
+    if not verify_command(command) or command[4:5] != "F":
+        raise LyfcoProtocolError("Invalid configuration response")
+    declared_length = int(command[2:4])
+    body = command[5 : declared_length - 2]
+    if (
+        len(body) != 11
+        or not body.isdigit()
+        or any(value not in "01" for value in body[5:])
+    ):
+        raise LyfcoProtocolError("Unsupported configuration response")
+    range_level = int(body[4])
+    if range_level > 4:
+        raise LyfcoProtocolError(
+            "Configuration response contains an invalid range level"
+        )
+    return MowerConfiguration(
+        mower_address=int(body[0:2]),
+        language_code=int(body[2:4]),
+        range_level=range_level,
+        ultrasonic_sensor=body[5] == "1",
+        rain_sensor=body[6] == "1",
+        touch_sensor=body[7] == "1",
+        pressure_sensor=body[8] == "1",
+        compass=body[9] == "1",
+        audible_alarm=body[10] == "1",
+    )
+
+
+def parse_schedule(command: str) -> MowerSchedule:
+    """Parse one verified S weekday schedule."""
+    if not verify_command(command) or command[4:5] != "S":
+        raise LyfcoProtocolError("Invalid schedule response")
+    declared_length = int(command[2:4])
+    body = command[5 : declared_length - 2]
+    if len(body) != 24 or not body.isdigit() or body[0] not in "0123456":
+        raise LyfcoProtocolError("Unsupported schedule response")
+    hour = int(body[2:4])
+    minute = int(body[4:6])
+    area_minutes = tuple(int(body[index : index + 3]) for index in range(6, 24, 3))
+    if hour > 23 or minute > 59 or any(value > 250 for value in area_minutes):
+        raise LyfcoProtocolError("Schedule response contains out-of-range values")
+    return MowerSchedule(
+        day=int(body[0]),
+        edge_mowing=body[1] == "1",
+        start_time=f"{hour:02d}:{minute:02d}",
+        area_minutes=area_minutes,  # type: ignore[arg-type]
     )
 
 
@@ -155,8 +294,13 @@ class LyfcoMowerClient:
         self._heartbeat_task: asyncio.Task[None] | None = None
         self._lock = asyncio.Lock()
         self._firmware: str | None = None
+        self._model: str | None = None
+        self._configuration: MowerConfiguration | None = None
         self._pin_checked = False
         self._pin_enabled = False
+        self._areas: tuple[MowerArea, ...] = ()
+        self._schedules: tuple[MowerSchedule, ...] = ()
+        self._extended_refreshed_at = 0.0
 
     async def async_get_status(self) -> MowerStatus:
         """Request status, reconnecting once if necessary."""
@@ -169,7 +313,33 @@ class LyfcoMowerClient:
                         await self._async_send_locked("CodeName=Search")
                         await self._async_send_command_locked("V")
                     await self._async_send_command_locked("W")
-                    return await self._async_wait_for_status_locked()
+                    status = await self._async_wait_for_status_locked()
+                    extended_complete = (
+                        self._configuration is not None
+                        and len(self._areas) == 6
+                        and len(self._schedules) == 7
+                    )
+                    refresh_interval = (
+                        EXTENDED_REFRESH_INTERVAL
+                        if extended_complete
+                        else INCOMPLETE_REFRESH_INTERVAL
+                    )
+                    if (
+                        time.monotonic() - self._extended_refreshed_at
+                        >= refresh_interval
+                    ):
+                        try:
+                            await self._async_refresh_extended_locked()
+                        except (OSError, asyncio.TimeoutError, LyfcoError) as error:
+                            # Extended data is optional; never make core status
+                            # unavailable merely because an R/S reply was lost.
+                            _LOGGER.debug("Lyfco extended read failed: %s", error)
+                    return replace(
+                        status,
+                        configuration=self._configuration,
+                        areas=self._areas,
+                        schedules=self._schedules,
+                    )
                 except (OSError, asyncio.TimeoutError, LyfcoError) as error:
                     last_error = error
                     _LOGGER.debug(
@@ -215,6 +385,124 @@ class LyfcoMowerClient:
     async def async_toggle_blade(self) -> None:
         """Send the app's Y8 blade toggle command."""
         await self._async_send_action("8", "toggle cutting blade")
+
+    async def async_sync_clock(self, local_time: datetime) -> None:
+        """Set the mower clock using the exact T format used by the app."""
+        if local_time.tzinfo is None or local_time.utcoffset() is None:
+            raise LyfcoProtocolError("Clock synchronization requires local time")
+        # Java Calendar uses Sunday=1 through Saturday=7.
+        weekday = (local_time.weekday() + 1) % 7 + 1
+        body = (
+            f"{local_time:%Y%m%d}{weekday}"
+            f"{local_time:%H%M%S}"
+        )
+        async with self._lock:
+            new_connection = await self._async_connect_locked()
+            if new_connection:
+                await self._async_send_locked("CodeName=Search")
+            await self._async_send_command_locked("T", body)
+
+    async def async_set_schedule(
+        self,
+        day: int,
+        start_hour: int,
+        start_minute: int,
+        edge_mowing: bool,
+        area_minutes: tuple[int, int, int, int, int, int],
+    ) -> MowerSchedule:
+        """Write one weekday schedule and verify it by reading it back."""
+        if (
+            day not in range(7)
+            or start_hour not in range(24)
+            or start_minute not in range(60)
+        ):
+            raise LyfcoProtocolError("Invalid schedule day or start time")
+        if any(value < 0 or value > 250 or value % 10 for value in area_minutes):
+            raise LyfcoProtocolError(
+                "Area minutes must be 0-250 in steps of 10 minutes"
+            )
+        body = (
+            f"{day}{int(edge_mowing)}{start_hour:02d}{start_minute:02d}"
+            + "".join(f"{value:03d}" for value in area_minutes)
+        )
+        expected = MowerSchedule(
+            day=day,
+            edge_mowing=edge_mowing,
+            start_time=f"{start_hour:02d}:{start_minute:02d}",
+            area_minutes=area_minutes,
+        )
+
+        async with self._lock:
+            new_connection = await self._async_connect_locked()
+            if new_connection:
+                await self._async_send_locked("CodeName=Search")
+            # Send the write exactly once. Any retry below is read-only.
+            await self._async_send_command_locked("S", body)
+            await asyncio.sleep(0.3)
+            confirmed: MowerSchedule | None = None
+            for _attempt in range(2):
+                commands = await self._async_collect_read_group_locked(
+                    (("S", str(day)),)
+                )
+                for command in commands:
+                    with suppress(LyfcoProtocolError):
+                        schedule = parse_schedule(command)
+                        if schedule.day == day:
+                            confirmed = schedule
+                if confirmed == expected:
+                    schedules = {
+                        schedule.day: schedule for schedule in self._schedules
+                    }
+                    schedules[day] = confirmed
+                    self._schedules = tuple(
+                        schedules[index] for index in sorted(schedules)
+                    )
+                    return confirmed
+            if confirmed is None:
+                raise LyfcoConnectionError(
+                    "The mower did not return the written schedule"
+                )
+            raise LyfcoProtocolError(
+                "The schedule read back from the mower did not match the "
+                "requested values"
+            )
+
+    async def async_set_rain_sensor(self, enabled: bool) -> MowerConfiguration:
+        """Change only the rain-sensor flag and verify the F configuration."""
+        async with self._lock:
+            if self._configuration is None:
+                raise LyfcoProtocolError(
+                    "The mower configuration has not been read yet; try again "
+                    "after the next update"
+                )
+            expected = replace(self._configuration, rain_sensor=enabled)
+            if expected == self._configuration:
+                return expected
+
+            new_connection = await self._async_connect_locked()
+            if new_connection:
+                await self._async_send_locked("CodeName=Search")
+            # F writes the complete configuration. Build it from the last valid
+            # mower response so unrelated sensor and language settings survive.
+            await self._async_send_command_locked("F", expected.as_body())
+            await asyncio.sleep(0.3)
+            confirmed: MowerConfiguration | None = None
+            for _attempt in range(2):
+                commands = await self._async_collect_read_group_locked((("F", ""),))
+                for command in commands:
+                    with suppress(LyfcoProtocolError):
+                        confirmed = parse_configuration(command)
+                if confirmed == expected:
+                    self._configuration = confirmed
+                    return confirmed
+            if confirmed is None:
+                raise LyfcoConnectionError(
+                    "The mower did not return its configuration after the change"
+                )
+            raise LyfcoProtocolError(
+                "The configuration read back from the mower did not match the "
+                "requested rain-sensor setting"
+            )
 
     async def _async_send_action(self, action: str, description: str) -> None:
         """Send one Y action directly without a blocking PIN query."""
@@ -298,6 +586,11 @@ class LyfcoMowerClient:
         while (remaining := deadline - time.monotonic()) > 0:
             async with asyncio.timeout(remaining):
                 message = await self._async_read_frame_locked()
+            if message.startswith("CodeName=SearchAck"):
+                model, firmware = parse_search_ack(message)
+                self._model = model or self._model
+                self._firmware = firmware or self._firmware
+                continue
             uart = _extract_uart(message)
             if uart is None or not verify_command(uart):
                 continue
@@ -308,8 +601,100 @@ class LyfcoMowerClient:
                 self._parse_pin_status(uart)
                 continue
             if uart[4:5] == "W":
-                return parse_status(uart, self._firmware)
+                return parse_status(uart, self._firmware, self._model)
         raise LyfcoConnectionError("Timed out waiting for W status response")
+
+    async def _async_collect_read_group_locked(
+        self, queries: tuple[tuple[str, str], ...]
+    ) -> list[str]:
+        """Send a small read group and collect verified matching replies."""
+        expected = {
+            (mark, body[:1] if mark == "S" else "") for mark, body in queries
+        }
+        commands: list[str] = []
+        for mark, body in queries:
+            await self._async_send_command_locked(mark, body)
+            await asyncio.sleep(0.15)
+
+        deadline = time.monotonic() + EXTENDED_RESPONSE_TIMEOUT
+        while (remaining := deadline - time.monotonic()) > 0:
+            try:
+                async with asyncio.timeout(remaining):
+                    message = await self._async_read_frame_locked()
+            except asyncio.TimeoutError:
+                break
+            uart = _extract_uart(message)
+            if uart is None or not verify_command(uart):
+                continue
+            mark = uart[4:5]
+            body = uart[5 : int(uart[2:4]) - 2]
+            key = (mark, body[:1] if mark == "S" else "")
+            if key not in expected:
+                continue
+            if uart not in commands:
+                commands.append(uart)
+            if mark == "R":
+                area_numbers = {
+                    command[5:6] for command in commands if command[4:5] == "R"
+                }
+                if area_numbers == set("123456"):
+                    break
+            elif all(
+                any(
+                    command[4:5] == expected_mark
+                    and (
+                        expected_mark != "S"
+                        or command[5:6] == expected_body
+                    )
+                    for command in commands
+                )
+                for expected_mark, expected_body in expected
+            ):
+                break
+        return commands
+
+    async def _async_refresh_extended_locked(self) -> None:
+        """Refresh read-only working-area and weekly-schedule caches."""
+        for command in await self._async_collect_read_group_locked((("F", ""),)):
+            with suppress(LyfcoProtocolError):
+                self._configuration = parse_configuration(command)
+
+        area_commands = await self._async_collect_read_group_locked((("R", ""),))
+        areas = {area.number: area for area in self._areas}
+        for command in area_commands:
+            with suppress(LyfcoProtocolError):
+                area = parse_area(command)
+                areas[area.number] = area
+        if len(areas) < 6:
+            for command in await self._async_collect_read_group_locked((("R", ""),)):
+                with suppress(LyfcoProtocolError):
+                    area = parse_area(command)
+                    areas[area.number] = area
+        self._areas = tuple(areas[number] for number in sorted(areas))
+
+        schedules = {schedule.day: schedule for schedule in self._schedules}
+        for first_day in range(0, 7, 2):
+            queries = tuple(
+                ("S", str(day)) for day in range(first_day, min(first_day + 2, 7))
+            )
+            for command in await self._async_collect_read_group_locked(queries):
+                with suppress(LyfcoProtocolError):
+                    schedule = parse_schedule(command)
+                    schedules[schedule.day] = schedule
+        for day in range(7):
+            if day in schedules:
+                continue
+            for command in await self._async_collect_read_group_locked(
+                (("S", str(day)),)
+            ):
+                with suppress(LyfcoProtocolError):
+                    schedule = parse_schedule(command)
+                    schedules[schedule.day] = schedule
+        self._schedules = tuple(schedules[day] for day in sorted(schedules))
+
+        # Even a partial/failed optional read is rate-limited so the mower's
+        # slow UART bridge is never flooded every 30 seconds.
+        self._extended_refreshed_at = time.monotonic()
 
     async def _async_wait_for_pin_status_locked(self) -> None:
         deadline = time.monotonic() + RESPONSE_TIMEOUT

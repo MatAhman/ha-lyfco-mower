@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.6.4 (experimental)
+
+- Added a synchronized switch for enabling or disabling the mower rain sensor.
+- Reads the current state from the mower's `F` configuration response.
+- Preserves every unrelated `F` setting and verifies a change by read-back.
+
+## 0.6.3 (experimental)
+
+- Reads model and firmware from the LAN `SearchAck` when the `V` query is unsupported.
+- Stores only `ByName` and `DevName`; Wi-Fi credential fields are never retained or logged.
+- Added one synchronized edge-mowing switch for every weekday.
+- Edge switches preserve start time and all six area durations, then verify by read-back.
+- Updated the diagnostic probe to mask `StaPd` and `ApPd` before display.
+
+## 0.6.2 (experimental)
+
+- Synchronizes the mower clock with Home Assistant local time at startup.
+- Re-synchronizes on every new local date and whenever UTC offset or time-zone
+  identity changes, covering both daylight-saving and standard-time transitions.
+- Failed automatic synchronization is retried after five minutes without making
+  ordinary mower status unavailable.
+- Added a manual `Synchronize mower clock` button.
+
+## 0.6.1 (experimental)
+
+- Replaced the seven schedule sensors with directly editable text entities,
+  following the approach used by Sunseeker's old wired-mower integration.
+- Schedule rows use `HH:MM - HH:MM` and can be edited from the device page.
+- Simple row editing preserves edge mowing and existing area allocation when
+  only the start time changes.
+- A changed duration is assigned safely to area 1 only when areas 2-6 are zero.
+- Multi-area duration changes are rejected with guidance to use the advanced action.
+- Removes obsolete schedule sensor registry entries during upgrade.
+
+## 0.6.0 (experimental)
+
+- Schedule sensor states now show calculated `start - end` times.
+- Added the `lyfco_mower.set_schedule` action with a Home Assistant form.
+- Validates six area durations against the original app's 0-250 minute range
+  and 10-minute step before transmitting anything.
+- Writes a schedule once, reads it back, and reports an error if verification fails.
+- Made migration cleanup of the obsolete blade switch more robust.
+
+## 0.5.1 (experimental)
+
+- Replaced the assumed-state cutting blade switch with a stateless toggle button.
+- Automatically removes the obsolete blade switch entity during upgrade.
+- Publishes partial schedule/area reads immediately at startup.
+- Retries incomplete extended data after 30 seconds; the five-minute cache is
+  used only after all six areas and all seven schedules have been read.
+
+## 0.5.0 (experimental)
+
+- Added read-only discovery of all six configured working areas.
+- Added read-only sensors for the seven weekday schedules.
+- Schedule attributes expose edge mowing and 0–250 minutes for each of the six areas.
+- Extended R/S data is cached for five minutes to avoid overloading the mower's UART bridge.
+- Missing working-area and schedule replies are retried automatically.
+
 ## 0.4.2
 
 - Added a black robot mower icon for Home Assistant and HACS.

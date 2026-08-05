@@ -44,6 +44,10 @@ async def async_setup_entry(
             LyfcoActionButton(
                 entry, "manual_right", "mdi:arrow-right-bold", "async_manual_right"
             ),
+            LyfcoActionButton(
+                entry, "blade", "mdi:saw-blade", "async_toggle_blade"
+            ),
+            LyfcoClockSyncButton(entry),
         ]
     )
 
@@ -66,3 +70,17 @@ class LyfcoActionButton(LyfcoEntity, ButtonEntity):
         except LyfcoError as error:
             raise HomeAssistantError(str(error)) from error
         # Let the normal coordinator poll update status after the command.
+
+
+class LyfcoClockSyncButton(LyfcoEntity, ButtonEntity):
+    """Force synchronization with Home Assistant's local time."""
+
+    _attr_translation_key = "sync_clock"
+    _attr_icon = "mdi:clock-sync-outline"
+
+    def __init__(self, entry: LyfcoConfigEntry) -> None:
+        super().__init__(entry, "sync_clock")
+
+    async def async_press(self) -> None:
+        if not await self.coordinator.async_sync_clock(force=True):
+            raise HomeAssistantError("Could not synchronize the mower clock")

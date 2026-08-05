@@ -13,13 +13,51 @@
     },
     "abort": {"already_configured": "Den här klipparen är redan konfigurerad."}
   },
+  "services": {
+    "set_schedule": {
+      "name": "Ställ in veckodagsschema",
+      "description": "Ställ in schemat för en veckodag och kontrollera det genom återläsning.",
+      "fields": {
+        "config_entry_id": {"name": "Klippare", "description": "Välj den konfigurerade klipparen."},
+        "day": {"name": "Veckodag"},
+        "start_time": {"name": "Starttid"},
+        "edge_mowing": {"name": "Kantklippning"},
+        "area_1_minutes": {"name": "Minuter område 1"},
+        "area_2_minutes": {"name": "Minuter område 2"},
+        "area_3_minutes": {"name": "Minuter område 3"},
+        "area_4_minutes": {"name": "Minuter område 4"},
+        "area_5_minutes": {"name": "Minuter område 5"},
+        "area_6_minutes": {"name": "Minuter område 6"}
+      }
+    }
+  },
   "entity": {
     "sensor": {
       "runtime_hours": {"name": "Total klipptid"},
       "charge_hours": {"name": "Total laddtid"},
       "voltage": {"name": "Maskinspänning"},
       "active_alarms": {"name": "Antal aktiva larm"},
-      "firmware": {"name": "Firmware"}
+      "firmware": {"name": "Firmware"},
+      "working_areas": {"name": "Aktiverade arbetsområden"}
+    },
+    "text": {
+      "schedule_sunday": {"name": "Schema söndag"},
+      "schedule_monday": {"name": "Schema måndag"},
+      "schedule_tuesday": {"name": "Schema tisdag"},
+      "schedule_wednesday": {"name": "Schema onsdag"},
+      "schedule_thursday": {"name": "Schema torsdag"},
+      "schedule_friday": {"name": "Schema fredag"},
+      "schedule_saturday": {"name": "Schema lördag"}
+    },
+    "switch": {
+      "rain_sensor": {"name": "Regnsensor"},
+      "edge_mowing_sunday": {"name": "Kantklippning söndag"},
+      "edge_mowing_monday": {"name": "Kantklippning måndag"},
+      "edge_mowing_tuesday": {"name": "Kantklippning tisdag"},
+      "edge_mowing_wednesday": {"name": "Kantklippning onsdag"},
+      "edge_mowing_thursday": {"name": "Kantklippning torsdag"},
+      "edge_mowing_friday": {"name": "Kantklippning fredag"},
+      "edge_mowing_saturday": {"name": "Kantklippning lördag"}
     },
     "binary_sensor": {
       "alarm_boundary_wire_broken": {"name": "Kantledningen är bruten"},
@@ -45,10 +83,9 @@
       "manual_forward": {"name": "Kör framåt"},
       "manual_reverse": {"name": "Kör bakåt"},
       "manual_left": {"name": "Sväng vänster"},
-      "manual_right": {"name": "Sväng höger"}
-    },
-    "switch": {
-      "blade": {"name": "Klippkniv"}
+      "manual_right": {"name": "Sväng höger"},
+      "blade": {"name": "Växla klippkniv"},
+      "sync_clock": {"name": "Synkronisera klipparens klocka"}
     }
   }
 }

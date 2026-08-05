@@ -13,13 +13,51 @@
     },
     "abort": {"already_configured": "This mower is already configured."}
   },
+  "services": {
+    "set_schedule": {
+      "name": "Set weekday schedule",
+      "description": "Set one mower weekday schedule and verify it by reading it back.",
+      "fields": {
+        "config_entry_id": {"name": "Mower", "description": "Select the configured mower."},
+        "day": {"name": "Weekday"},
+        "start_time": {"name": "Start time"},
+        "edge_mowing": {"name": "Edge mowing"},
+        "area_1_minutes": {"name": "Area 1 minutes"},
+        "area_2_minutes": {"name": "Area 2 minutes"},
+        "area_3_minutes": {"name": "Area 3 minutes"},
+        "area_4_minutes": {"name": "Area 4 minutes"},
+        "area_5_minutes": {"name": "Area 5 minutes"},
+        "area_6_minutes": {"name": "Area 6 minutes"}
+      }
+    }
+  },
   "entity": {
     "sensor": {
       "runtime_hours": {"name": "Total mowing time"},
       "charge_hours": {"name": "Total charging time"},
       "voltage": {"name": "Machine voltage"},
       "active_alarms": {"name": "Active alarm count"},
-      "firmware": {"name": "Firmware"}
+      "firmware": {"name": "Firmware"},
+      "working_areas": {"name": "Enabled working areas"}
+    },
+    "text": {
+      "schedule_sunday": {"name": "Sunday schedule"},
+      "schedule_monday": {"name": "Monday schedule"},
+      "schedule_tuesday": {"name": "Tuesday schedule"},
+      "schedule_wednesday": {"name": "Wednesday schedule"},
+      "schedule_thursday": {"name": "Thursday schedule"},
+      "schedule_friday": {"name": "Friday schedule"},
+      "schedule_saturday": {"name": "Saturday schedule"}
+    },
+    "switch": {
+      "rain_sensor": {"name": "Rain sensor"},
+      "edge_mowing_sunday": {"name": "Edge mowing Sunday"},
+      "edge_mowing_monday": {"name": "Edge mowing Monday"},
+      "edge_mowing_tuesday": {"name": "Edge mowing Tuesday"},
+      "edge_mowing_wednesday": {"name": "Edge mowing Wednesday"},
+      "edge_mowing_thursday": {"name": "Edge mowing Thursday"},
+      "edge_mowing_friday": {"name": "Edge mowing Friday"},
+      "edge_mowing_saturday": {"name": "Edge mowing Saturday"}
     },
     "binary_sensor": {
       "alarm_boundary_wire_broken": {"name": "Boundary wire broken"},
@@ -45,10 +83,9 @@
       "manual_forward": {"name": "Drive forward"},
       "manual_reverse": {"name": "Drive reverse"},
       "manual_left": {"name": "Turn left"},
-      "manual_right": {"name": "Turn right"}
-    },
-    "switch": {
-      "blade": {"name": "Cutting blade"}
+      "manual_right": {"name": "Turn right"},
+      "blade": {"name": "Toggle cutting blade"},
+      "sync_clock": {"name": "Synchronize mower clock"}
     }
   }
 }
