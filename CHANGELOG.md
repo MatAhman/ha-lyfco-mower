@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1 (experimental)
+
+- Restored mower device grouping on Home Assistant 2026.8 by explicitly
+  creating the device for its single owning config entry before entity setup.
+- Kept all existing entity unique IDs and device identifiers unchanged.
+
 ## 0.7.0 (experimental)
 
 - Added combined command/voltage activity inference for the standard mower entity.
