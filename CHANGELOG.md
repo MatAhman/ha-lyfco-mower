@@ -1,19 +1,5 @@
 # Changelog
 
-## 0.7.0 (experimental)
-
-- Added combined command/voltage activity inference for the standard mower entity.
-- Added inferred `Docked` and active `Charging` binary sensors. Dock state is
-  remembered after charging has been observed, including the full/maintenance phase.
-- Added `Rain detected (inferred)` after an automatic run returns to charging
-  without a home/stop command, low-battery indication, or another alarm.
-- Corrected alarm bits 7-9 from the original EGRobot 1.0.1 application: lift
-  sensor, pressure sensor, and collision sensor.
-- Retained the existing unique IDs while correcting alarm names, preventing
-  duplicate entities during upgrade.
-- Renamed unverified alarm bits 12-14 to `Unknown alarm 12-14` instead of
-  presenting speculative meanings.
-
 ## 0.6.4 (experimental)
 
 - Added a synchronized switch for enabling or disabling the mower rain sensor.
