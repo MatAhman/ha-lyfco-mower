@@ -41,10 +41,35 @@ class LyfcoLawnMower(LyfcoEntity, LawnMowerEntity):
 
     @property
     def activity(self) -> LawnMowerActivity | None:
-        """Return alarms or the activity inferred from the last command."""
+        """Return alarms or the combined command/voltage activity."""
         if any(self.coordinator.data.alarm_flags):
             return LawnMowerActivity.ERROR
-        return self._assumed_activity
+        if self._assumed_activity is not None:
+            return self._assumed_activity
+        activity = self.coordinator.data.inferred_activity
+        return {
+            "mowing": LawnMowerActivity.MOWING,
+            "paused": LawnMowerActivity.PAUSED,
+            "returning": LawnMowerActivity.RETURNING,
+            "docked": LawnMowerActivity.DOCKED,
+        }.get(activity)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        return {
+            "inferred": True,
+            "inference_source": self.coordinator.data.inference_source,
+            "charging": self.coordinator.data.charging,
+            "docked": self.coordinator.data.docked,
+            "rain_detected_inferred": (
+                self.coordinator.data.rain_detected_inferred
+            ),
+        }
+
+    def _handle_coordinator_update(self) -> None:
+        """Replace immediate optimistic activity with the latest inference."""
+        self._assumed_activity = None
+        super()._handle_coordinator_update()
 
     async def _async_command(
         self, method_name: str, activity: LawnMowerActivity

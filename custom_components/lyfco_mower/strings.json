@@ -60,20 +60,23 @@
       "edge_mowing_saturday": {"name": "Edge mowing Saturday"}
     },
     "binary_sensor": {
+      "docked": {"name": "Docked"},
+      "charging": {"name": "Charging"},
+      "rain_detected_inferred": {"name": "Rain detected (inferred)"},
       "alarm_boundary_wire_broken": {"name": "Boundary wire broken"},
       "alarm_charging_station_no_power": {"name": "Charging station has no power"},
       "alarm_low_battery": {"name": "Low battery"},
       "alarm_left_wheel_motor_overload": {"name": "Left wheel motor overloaded"},
       "alarm_right_wheel_motor_overload": {"name": "Right wheel motor overloaded"},
       "alarm_blade_motor_overload": {"name": "Blade motor overloaded"},
-      "alarm_lift_pressure_sensor_1": {"name": "Lift/pressure sensor 1"},
-      "alarm_lift_pressure_sensor_2": {"name": "Lift/pressure sensor 2"},
-      "alarm_lift_pressure_sensor_3": {"name": "Lift/pressure sensor 3"},
+      "alarm_lift_sensor": {"name": "Lift sensor active"},
+      "alarm_pressure_sensor": {"name": "Pressure sensor active"},
+      "alarm_collision_sensor": {"name": "Collision sensor active"},
       "alarm_handle_sensor": {"name": "Handle sensor active"},
       "alarm_mower_tilted": {"name": "Mower tilted"},
-      "alarm_wire_signal_lost": {"name": "Wire signal lost"},
-      "alarm_outside_boundary": {"name": "Outside boundary"},
-      "alarm_mower_stuck": {"name": "Mower stuck"}
+      "alarm_unknown_alarm_12": {"name": "Unknown alarm 12"},
+      "alarm_unknown_alarm_13": {"name": "Unknown alarm 13"},
+      "alarm_unknown_alarm_14": {"name": "Unknown alarm 14"}
     },
     "button": {
       "start_auto": {"name": "Start automatically"},

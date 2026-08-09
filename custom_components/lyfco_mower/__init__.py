@@ -12,9 +12,10 @@ from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
-from .const import DOMAIN, PLATFORMS
+from .const import DEFAULT_NAME, DOMAIN, PLATFORMS
 from .coordinator import LyfcoCoordinator
 from .protocol import LyfcoError, LyfcoMowerClient
 
@@ -92,6 +93,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: LyfcoConfigEntry) -> boo
     coordinator = LyfcoCoordinator(hass, entry, client)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = LyfcoRuntimeData(client, coordinator)
+
+    # Home Assistant 2026.8 restricts each device to one config entry. Create
+    # the mower explicitly for this entry before forwarding its entity
+    # platforms instead of relying only on implicit DeviceInfo processing.
+    host = entry.data[CONF_HOST]
+    device_registry = dr.async_get(hass)
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, host)},
+        name=DEFAULT_NAME,
+        manufacturer="Lyfco",
+        model=coordinator.data.model
+        or "Robot mower (local LAN protocol)",
+        sw_version=coordinator.data.firmware,
+    )
+
     # v0.5.1 replaced the optimistic blade switch with a stateless button.
     # Remove the obsolete registry entry so it does not remain unavailable.
     registry = er.async_get(hass)

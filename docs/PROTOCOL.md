@@ -49,6 +49,44 @@ command on touch release.
 - `R`: six working-area records (`R` + area + located + enabled)
 - `S0`–`S6`: Sunday–Saturday schedule reads
 
+### `W` alarm flags
+
+The final fourteen digits of the verified `W` response are Boolean alarm
+flags. The first eleven meanings below come from the original EGRobot Android
+application. The application does not identify flags 12–14, so the integration
+deliberately exposes those as unknown instead of assigning speculative names.
+
+| Flag | Meaning |
+| ---: | --- |
+| 1 | Boundary wire broken |
+| 2 | Charging station has no power |
+| 3 | Battery low or abnormal |
+| 4 | Left wheel motor overload |
+| 5 | Right wheel motor overload |
+| 6 | Blade motor overload |
+| 7 | Lift sensor triggered |
+| 8 | Pressure sensor triggered |
+| 9 | Collision sensor triggered |
+| 10 | Handle sensor triggered |
+| 11 | Excessive mower tilt |
+| 12–14 | Unknown alarm flags |
+
+### Inferred activity and rain
+
+No direct activity, dock, charging, blade-running, or rain-wet field has been
+found. On the tested Lyfco E1750, moving/mowing samples were approximately
+25.71–26.19 V and active charging samples were approximately 26.62–27.41 V.
+The integration therefore uses 26.4 V as the active-charging threshold and
+remembers the mower as docked when charge maintenance later lowers the voltage.
+A verified movement command clears that dock memory.
+
+Wet-sensor testing showed an automatically mowing machine returning to its
+station without setting a distinct `W` flag. The integration reports inferred
+rain only when a run started with `Y5` later reaches charging without a `Y7`
+return command, a low-battery flag, or another alarm having appeared during the
+run. This is a heuristic: schedule completion and commands issued from the
+physical panel or another client can produce the same observations.
+
 The verified schedule response body contains day, edge-mowing flag, `HHMM`,
 and six three-digit area durations. The original app limits every area duration
 to 0–250 minutes in 10-minute steps. Example for Friday, edge mowing enabled,

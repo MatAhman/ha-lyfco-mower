@@ -18,6 +18,25 @@ ALARM_KEYS = (
     "left_wheel_motor_overload",
     "right_wheel_motor_overload",
     "blade_motor_overload",
+    "lift_sensor",
+    "pressure_sensor",
+    "collision_sensor",
+    "handle_sensor",
+    "mower_tilted",
+    "unknown_alarm_12",
+    "unknown_alarm_13",
+    "unknown_alarm_14",
+)
+
+# Preserve the entity unique IDs used by versions through 0.6.4. This lets an
+# upgrade correct the displayed alarm names without creating duplicate entities.
+ALARM_UNIQUE_KEYS = (
+    "boundary_wire_broken",
+    "charging_station_no_power",
+    "low_battery",
+    "left_wheel_motor_overload",
+    "right_wheel_motor_overload",
+    "blade_motor_overload",
     "lift_pressure_sensor_1",
     "lift_pressure_sensor_2",
     "lift_pressure_sensor_3",
@@ -27,3 +46,5 @@ ALARM_KEYS = (
     "outside_boundary",
     "mower_stuck",
 )
+
+CHARGING_VOLTAGE = 26.4

@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.7.3 (experimental)
+
+- Republished the complete status update with a new version so HACS cannot
+  reuse an earlier cached 0.7.2 archive.
+- Includes the `Docked`, `Charging`, and inferred rain binary sensors.
+- Includes TCP EOF recovery and the schedule action YAML without merge keys.
+
+## 0.7.2 (experimental)
+
+- Treat an unexpected TCP EOF from the Miotlink bridge as a recoverable
+  connection failure.
+- Reset the stale stream and retry the status query on a fresh socket instead
+  of leaving the coordinator with an unexpected `IncompleteReadError`.
+- Removed YAML merge keys from the schedule action description to prevent
+  duplicate `name` warnings in Home Assistant 2026.8.
+
+## 0.7.1 (experimental)
+
+- Restored mower device grouping on Home Assistant 2026.8 by explicitly
+  creating the device for its single owning config entry before entity setup.
+- Kept all existing entity unique IDs and device identifiers unchanged.
+
+## 0.7.0 (experimental)
+
+- Added combined command/voltage activity inference for the standard mower entity.
+- Added inferred `Docked` and active `Charging` binary sensors. Dock state is
+  remembered after charging has been observed, including the full/maintenance phase.
+- Added `Rain detected (inferred)` after an automatic run returns to charging
+  without a home/stop command, low-battery indication, or another alarm.
+- Corrected alarm bits 7-9 from the original EGRobot 1.0.1 application: lift
+  sensor, pressure sensor, and collision sensor.
+- Retained the existing unique IDs while correcting alarm names, preventing
+  duplicate entities during upgrade.
+- Renamed unverified alarm bits 12-14 to `Unknown alarm 12-14` instead of
+  presenting speculative meanings.
+
 ## 0.6.4 (experimental)
 
 - Added a synchronized switch for enabling or disabling the mower rain sensor.

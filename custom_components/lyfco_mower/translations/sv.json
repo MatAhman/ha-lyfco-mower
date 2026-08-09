@@ -60,20 +60,23 @@
       "edge_mowing_saturday": {"name": "Kantklippning lördag"}
     },
     "binary_sensor": {
+      "docked": {"name": "Dockad"},
+      "charging": {"name": "Laddar"},
+      "rain_detected_inferred": {"name": "Regn upptäckt (härledd)"},
       "alarm_boundary_wire_broken": {"name": "Kantledningen är bruten"},
       "alarm_charging_station_no_power": {"name": "Ingen ström till laddstationen"},
       "alarm_low_battery": {"name": "Låg batteriladdning"},
       "alarm_left_wheel_motor_overload": {"name": "Vänster körmotor överbelastad"},
       "alarm_right_wheel_motor_overload": {"name": "Höger körmotor överbelastad"},
       "alarm_blade_motor_overload": {"name": "Klippmotor överbelastad"},
-      "alarm_lift_pressure_sensor_1": {"name": "Lyft-/trycksensor 1"},
-      "alarm_lift_pressure_sensor_2": {"name": "Lyft-/trycksensor 2"},
-      "alarm_lift_pressure_sensor_3": {"name": "Lyft-/trycksensor 3"},
+      "alarm_lift_sensor": {"name": "Lyftsensor aktiverad"},
+      "alarm_pressure_sensor": {"name": "Trycksensor aktiverad"},
+      "alarm_collision_sensor": {"name": "Kollisionssensor aktiverad"},
       "alarm_handle_sensor": {"name": "Handtagssensor aktiverad"},
-      "alarm_mower_tilted": {"name": "Klipparen har vält"},
-      "alarm_wire_signal_lost": {"name": "Trådsignal förlorad"},
-      "alarm_outside_boundary": {"name": "Utanför kanttråd"},
-      "alarm_mower_stuck": {"name": "Klipparen har fastnat"}
+      "alarm_mower_tilted": {"name": "Klipparen lutar för mycket"},
+      "alarm_unknown_alarm_12": {"name": "Okänt larm 12"},
+      "alarm_unknown_alarm_13": {"name": "Okänt larm 13"},
+      "alarm_unknown_alarm_14": {"name": "Okänt larm 14"}
     },
     "button": {
       "start_auto": {"name": "Starta automatiskt"},

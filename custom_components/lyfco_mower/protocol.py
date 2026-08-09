@@ -9,7 +9,7 @@ from datetime import datetime
 import logging
 import time
 
-from .const import ALARM_KEYS, DEFAULT_PORT
+from .const import ALARM_KEYS, CHARGING_VOLTAGE, DEFAULT_PORT
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,6 +90,11 @@ class MowerStatus:
     configuration: MowerConfiguration | None = None
     areas: tuple[MowerArea, ...] = ()
     schedules: tuple[MowerSchedule, ...] = ()
+    inferred_activity: str | None = None
+    docked: bool = False
+    charging: bool = False
+    rain_detected_inferred: bool = False
+    inference_source: str | None = None
 
     @property
     def active_alarm_keys(self) -> tuple[str, ...]:
@@ -301,6 +306,12 @@ class LyfcoMowerClient:
         self._areas: tuple[MowerArea, ...] = ()
         self._schedules: tuple[MowerSchedule, ...] = ()
         self._extended_refreshed_at = 0.0
+        self._last_action: str | None = None
+        self._activity: str | None = None
+        self._docked_latched = False
+        self._rain_detected_inferred = False
+        self._alarm_seen_since_auto = False
+        self._low_battery_seen_since_auto = False
 
     async def async_get_status(self) -> MowerStatus:
         """Request status, reconnecting once if necessary."""
@@ -334,6 +345,7 @@ class LyfcoMowerClient:
                             # Extended data is optional; never make core status
                             # unavailable merely because an R/S reply was lost.
                             _LOGGER.debug("Lyfco extended read failed: %s", error)
+                    status = self._infer_status(status)
                     return replace(
                         status,
                         configuration=self._configuration,
@@ -514,6 +526,7 @@ class LyfcoMowerClient:
                     if new_connection:
                         await self._async_send_locked("CodeName=Search")
                     await self._async_send_command_locked("Y", action)
+                    self._record_action(action)
                     return
                 except (OSError, asyncio.TimeoutError, LyfcoConnectionError) as error:
                     last_error = error
@@ -530,6 +543,70 @@ class LyfcoMowerClient:
                 f"Unable to send {description} to {self.host}:{self.port}: "
                 f"{last_error!r}"
             ) from last_error
+
+    def _record_action(self, action: str) -> None:
+        """Remember a verified action for the next inferred status update."""
+        if action == "0":
+            self._activity = "paused"
+        elif action == "5":
+            self._activity = "mowing"
+            self._docked_latched = False
+            self._rain_detected_inferred = False
+            self._alarm_seen_since_auto = False
+            self._low_battery_seen_since_auto = False
+        elif action == "7":
+            self._activity = "returning"
+            self._docked_latched = False
+            self._rain_detected_inferred = False
+        elif action == "6":
+            self._activity = "paused"
+            self._docked_latched = False
+            self._rain_detected_inferred = False
+        elif action in {"1", "2", "3", "4"}:
+            self._activity = "mowing"
+            self._docked_latched = False
+            self._rain_detected_inferred = False
+        # Y8 is a stateless blade toggle and does not establish mower motion.
+        self._last_action = action
+
+    def _infer_status(self, status: MowerStatus) -> MowerStatus:
+        """Combine voltage and the last command into a conservative state."""
+        charging = status.voltage >= CHARGING_VOLTAGE
+        source = "last_command" if self._activity is not None else None
+        if self._last_action == "5":
+            self._alarm_seen_since_auto |= any(status.alarm_flags)
+            if len(status.alarm_flags) >= 3:
+                self._low_battery_seen_since_auto |= status.alarm_flags[2]
+
+        if charging:
+            # Two recorded tests showed 26.62-27.41 V after docking versus
+            # 25.71-26.19 V while moving or resting. Remember docked state so
+            # it survives the charger's later maintenance/idle phase.
+            self._docked_latched = True
+            if (
+                self._last_action == "5"
+                and not self._low_battery_seen_since_auto
+                and not self._alarm_seen_since_auto
+            ):
+                # The mower returned and began charging without Y7/Y0 and
+                # without a low-battery/alarm indication. The wet-sensor test
+                # demonstrated this exact sequence. It remains explicitly
+                # labelled inferred because schedule completion can look alike.
+                self._rain_detected_inferred = True
+            self._activity = "docked"
+            source = "charging_voltage"
+        elif self._docked_latched:
+            self._activity = "docked"
+            source = "remembered_dock"
+
+        return replace(
+            status,
+            inferred_activity=self._activity,
+            docked=self._docked_latched,
+            charging=charging,
+            rain_detected_inferred=self._rain_detected_inferred,
+            inference_source=source,
+        )
 
     async def async_close(self) -> None:
         """Close the client and stop heartbeat."""
@@ -565,21 +642,29 @@ class LyfcoMowerClient:
     async def _async_read_frame_locked(self) -> str:
         if self._reader is None:
             raise LyfcoConnectionError("TCP connection is closed")
-        while True:
-            # Some mower commands produce a short, unframed acknowledgement.
-            # Search for the next VSP marker instead of assuming that the
-            # stream is already positioned exactly at a frame boundary.
-            marker = bytearray()
-            while bytes(marker) != b"0h":
-                marker.append((await self._reader.readexactly(1))[0])
-                if len(marker) > 2:
-                    del marker[0]
-            header = b"0h" + await self._reader.readexactly(2)
-            frame_length = int.from_bytes(header[2:4], "big")
-            if frame_length < VSP_HEADER_SIZE or frame_length > 65535:
-                continue
-            remainder = await self._reader.readexactly(frame_length - 4)
-            return decode_vsp(header + remainder)
+        try:
+            while True:
+                # Some mower commands produce a short, unframed acknowledgement.
+                # Search for the next VSP marker instead of assuming that the
+                # stream is already positioned exactly at a frame boundary.
+                marker = bytearray()
+                while bytes(marker) != b"0h":
+                    marker.append((await self._reader.readexactly(1))[0])
+                    if len(marker) > 2:
+                        del marker[0]
+                header = b"0h" + await self._reader.readexactly(2)
+                frame_length = int.from_bytes(header[2:4], "big")
+                if frame_length < VSP_HEADER_SIZE or frame_length > 65535:
+                    continue
+                remainder = await self._reader.readexactly(frame_length - 4)
+                return decode_vsp(header + remainder)
+        except (asyncio.IncompleteReadError, ConnectionError) as error:
+            # The Miotlink bridge occasionally closes an otherwise healthy
+            # persistent connection. Convert EOF into our connection error so
+            # the caller resets the stream and retries on a fresh socket.
+            raise LyfcoConnectionError(
+                "Mower closed the TCP connection while a frame was being read"
+            ) from error
 
     async def _async_wait_for_status_locked(self) -> MowerStatus:
         deadline = time.monotonic() + RESPONSE_TIMEOUT
