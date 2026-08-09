@@ -183,6 +183,24 @@ button.
 - For AP discovery, verify the computer has an address such as `192.168.4.2` and
   can ping `192.168.4.1`.
 
+## Publishing this repository
+
+1. Create a public GitHub repository, for example `ha-lyfco-mower`.
+2. Upload the **contents** of this directory to the repository root.
+3. Commit and push the files.
+4. Optionally create a release tagged `v0.6.4`.
+
+Example command-line workflow:
+
+```bash
+git init
+git add .
+git commit -m "Add synchronized rain sensor switch in v0.6.4"
+git branch -M main
+git remote add origin https://github.com/MatAhman/ha-lyfco-mower.git
+git push -u origin main
+```
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
