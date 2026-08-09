@@ -1,0 +1,94 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Anslut till Lyfco robotgräsklippare",
+        "description": "Klipparen måste vara ansluten till samma lokala nätverk som Home Assistant.",
+        "data": {"host": "IP-adress eller värdnamn"}
+      }
+    },
+    "error": {
+      "cannot_connect": "Kunde inte ansluta eller få ett giltigt statussvar.",
+      "invalid_host": "Ange en IP-adress eller ett värdnamn."
+    },
+    "abort": {"already_configured": "Den här klipparen är redan konfigurerad."}
+  },
+  "services": {
+    "set_schedule": {
+      "name": "Ställ in veckodagsschema",
+      "description": "Ställ in schemat för en veckodag och kontrollera det genom återläsning.",
+      "fields": {
+        "config_entry_id": {"name": "Klippare", "description": "Välj den konfigurerade klipparen."},
+        "day": {"name": "Veckodag"},
+        "start_time": {"name": "Starttid"},
+        "edge_mowing": {"name": "Kantklippning"},
+        "area_1_minutes": {"name": "Minuter område 1"},
+        "area_2_minutes": {"name": "Minuter område 2"},
+        "area_3_minutes": {"name": "Minuter område 3"},
+        "area_4_minutes": {"name": "Minuter område 4"},
+        "area_5_minutes": {"name": "Minuter område 5"},
+        "area_6_minutes": {"name": "Minuter område 6"}
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "runtime_hours": {"name": "Total klipptid"},
+      "charge_hours": {"name": "Total laddtid"},
+      "voltage": {"name": "Maskinspänning"},
+      "active_alarms": {"name": "Antal aktiva larm"},
+      "firmware": {"name": "Firmware"},
+      "working_areas": {"name": "Aktiverade arbetsområden"}
+    },
+    "text": {
+      "schedule_sunday": {"name": "Schema söndag"},
+      "schedule_monday": {"name": "Schema måndag"},
+      "schedule_tuesday": {"name": "Schema tisdag"},
+      "schedule_wednesday": {"name": "Schema onsdag"},
+      "schedule_thursday": {"name": "Schema torsdag"},
+      "schedule_friday": {"name": "Schema fredag"},
+      "schedule_saturday": {"name": "Schema lördag"}
+    },
+    "switch": {
+      "rain_sensor": {"name": "Regnsensor"},
+      "edge_mowing_sunday": {"name": "Kantklippning söndag"},
+      "edge_mowing_monday": {"name": "Kantklippning måndag"},
+      "edge_mowing_tuesday": {"name": "Kantklippning tisdag"},
+      "edge_mowing_wednesday": {"name": "Kantklippning onsdag"},
+      "edge_mowing_thursday": {"name": "Kantklippning torsdag"},
+      "edge_mowing_friday": {"name": "Kantklippning fredag"},
+      "edge_mowing_saturday": {"name": "Kantklippning lördag"}
+    },
+    "binary_sensor": {
+      "docked": {"name": "Dockad"},
+      "charging": {"name": "Laddar"},
+      "rain_detected_inferred": {"name": "Regn upptäckt (härledd)"},
+      "alarm_boundary_wire_broken": {"name": "Kantledningen är bruten"},
+      "alarm_charging_station_no_power": {"name": "Ingen ström till laddstationen"},
+      "alarm_low_battery": {"name": "Låg batteriladdning"},
+      "alarm_left_wheel_motor_overload": {"name": "Vänster körmotor överbelastad"},
+      "alarm_right_wheel_motor_overload": {"name": "Höger körmotor överbelastad"},
+      "alarm_blade_motor_overload": {"name": "Klippmotor överbelastad"},
+      "alarm_lift_sensor": {"name": "Lyftsensor aktiverad"},
+      "alarm_pressure_sensor": {"name": "Trycksensor aktiverad"},
+      "alarm_collision_sensor": {"name": "Kollisionssensor aktiverad"},
+      "alarm_handle_sensor": {"name": "Handtagssensor aktiverad"},
+      "alarm_mower_tilted": {"name": "Klipparen lutar för mycket"},
+      "alarm_unknown_alarm_12": {"name": "Okänt larm 12"},
+      "alarm_unknown_alarm_13": {"name": "Okänt larm 13"},
+      "alarm_unknown_alarm_14": {"name": "Okänt larm 14"}
+    },
+    "button": {
+      "start_auto": {"name": "Starta automatiskt"},
+      "go_home": {"name": "Åk till laddstation"},
+      "stop": {"name": "Stopp"},
+      "manual_mode": {"name": "Aktivera manuellt läge"},
+      "manual_forward": {"name": "Kör framåt"},
+      "manual_reverse": {"name": "Kör bakåt"},
+      "manual_left": {"name": "Sväng vänster"},
+      "manual_right": {"name": "Sväng höger"},
+      "blade": {"name": "Växla klippkniv"},
+      "sync_clock": {"name": "Synkronisera klipparens klocka"}
+    }
+  }
+}

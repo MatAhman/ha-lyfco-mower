@@ -39,7 +39,12 @@ newer. The icon is also included as a HACS brand asset.
 - Manual mode with forward, reverse, left, and right controls.
 - Stateless cutting blade toggle button.
 - Machine voltage, total mowing time, total charging time, and firmware sensors.
-- Fourteen decoded diagnostic alarm sensors.
+- Eleven identified diagnostic alarm sensors plus three explicitly unknown
+  alarm flags reserved for future protocol analysis.
+- Inferred mowing, returning, docked, and active-charging status based on the
+  last verified command and measured voltage.
+- Inferred rain detection when an automatic run returns to charge without a
+  home command, low-battery indication, or another alarm.
 - Read-only working-area configuration and seven weekday schedule sensors.
 - Seven directly editable weekday rows displayed as `start - end` ranges.
 - Schedule editing through the `lyfco_mower.set_schedule` action with read-back verification.
@@ -53,8 +58,14 @@ newer. The icon is also included as a HACS brand asset.
 
 ## Important limitations
 
-- The mower status response does not report mowing, dock, or blade state.
-  Activity shown by Home Assistant is inferred from the most recent command.
+- The mower status response does not directly report mowing, dock, rain, or
+  blade state. Activity combines the most recent verified command with measured
+  voltage. Active charging is detected at 26.4 V and above on the tested E1750;
+  dock state is then remembered until a new movement command is sent.
+- `Rain detected (inferred)` is not a physical wet-contact reading. It indicates
+  that a mower started through this integration returned to charging without a
+  home/stop command, low-battery indication, or another alarm. Schedule
+  completion or a physical-panel command can therefore cause an incorrect result.
 - The blade uses a toggle-only command (`Y8`) and the mower reports no blade
   state. It is therefore exposed as a stateless button rather than a switch.
 - The Android app contains no command for acknowledging or clearing alarms.
@@ -88,8 +99,6 @@ The mower should have a DHCP reservation because the integration currently uses
 the configured address as its unique identifier.
 
 ### HACS custom repository
-
-After this project has been uploaded to GitHub:
 
 1. Open HACS.
 2. Open the menu and select **Custom repositories**.
