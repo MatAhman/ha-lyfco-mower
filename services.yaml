@@ -39,7 +39,7 @@ set_schedule:
       default: false
       selector:
         boolean:
-    area_1_minutes:
+    area_1_minutes: &area_minutes
       name: Area 1 minutes
       default: 0
       selector:
@@ -50,52 +50,17 @@ set_schedule:
           unit_of_measurement: min
           mode: slider
     area_2_minutes:
+      <<: *area_minutes
       name: Area 2 minutes
-      default: 0
-      selector:
-        number:
-          min: 0
-          max: 250
-          step: 10
-          unit_of_measurement: min
-          mode: slider
     area_3_minutes:
+      <<: *area_minutes
       name: Area 3 minutes
-      default: 0
-      selector:
-        number:
-          min: 0
-          max: 250
-          step: 10
-          unit_of_measurement: min
-          mode: slider
     area_4_minutes:
+      <<: *area_minutes
       name: Area 4 minutes
-      default: 0
-      selector:
-        number:
-          min: 0
-          max: 250
-          step: 10
-          unit_of_measurement: min
-          mode: slider
     area_5_minutes:
+      <<: *area_minutes
       name: Area 5 minutes
-      default: 0
-      selector:
-        number:
-          min: 0
-          max: 250
-          step: 10
-          unit_of_measurement: min
-          mode: slider
     area_6_minutes:
+      <<: *area_minutes
       name: Area 6 minutes
-      default: 0
-      selector:
-        number:
-          min: 0
-          max: 250
-          step: 10
-          unit_of_measurement: min
-          mode: slider
