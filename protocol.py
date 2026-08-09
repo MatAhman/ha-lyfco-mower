@@ -642,29 +642,21 @@ class LyfcoMowerClient:
     async def _async_read_frame_locked(self) -> str:
         if self._reader is None:
             raise LyfcoConnectionError("TCP connection is closed")
-        try:
-            while True:
-                # Some mower commands produce a short, unframed acknowledgement.
-                # Search for the next VSP marker instead of assuming that the
-                # stream is already positioned exactly at a frame boundary.
-                marker = bytearray()
-                while bytes(marker) != b"0h":
-                    marker.append((await self._reader.readexactly(1))[0])
-                    if len(marker) > 2:
-                        del marker[0]
-                header = b"0h" + await self._reader.readexactly(2)
-                frame_length = int.from_bytes(header[2:4], "big")
-                if frame_length < VSP_HEADER_SIZE or frame_length > 65535:
-                    continue
-                remainder = await self._reader.readexactly(frame_length - 4)
-                return decode_vsp(header + remainder)
-        except (asyncio.IncompleteReadError, ConnectionError) as error:
-            # The Miotlink bridge occasionally closes an otherwise healthy
-            # persistent connection. Convert EOF into our connection error so
-            # the caller resets the stream and retries on a fresh socket.
-            raise LyfcoConnectionError(
-                "Mower closed the TCP connection while a frame was being read"
-            ) from error
+        while True:
+            # Some mower commands produce a short, unframed acknowledgement.
+            # Search for the next VSP marker instead of assuming that the
+            # stream is already positioned exactly at a frame boundary.
+            marker = bytearray()
+            while bytes(marker) != b"0h":
+                marker.append((await self._reader.readexactly(1))[0])
+                if len(marker) > 2:
+                    del marker[0]
+            header = b"0h" + await self._reader.readexactly(2)
+            frame_length = int.from_bytes(header[2:4], "big")
+            if frame_length < VSP_HEADER_SIZE or frame_length > 65535:
+                continue
+            remainder = await self._reader.readexactly(frame_length - 4)
+            return decode_vsp(header + remainder)
 
     async def _async_wait_for_status_locked(self) -> MowerStatus:
         deadline = time.monotonic() + RESPONSE_TIMEOUT

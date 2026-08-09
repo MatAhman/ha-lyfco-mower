@@ -1,12 +1,5 @@
 # Changelog
 
-## 0.7.2 (experimental)
-
-- Treat an unexpected TCP EOF from the Miotlink bridge as a recoverable
-  connection failure.
-- Reset the stale stream and retry the status query on a fresh socket instead
-  of leaving the coordinator with an unexpected `IncompleteReadError`.
-
 ## 0.7.1 (experimental)
 
 - Restored mower device grouping on Home Assistant 2026.8 by explicitly
