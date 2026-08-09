@@ -1,11 +1,20 @@
 # Changelog
 
+## 0.7.3 (experimental)
+
+- Republished the complete status update with a new version so HACS cannot
+  reuse an earlier cached 0.7.2 archive.
+- Includes the `Docked`, `Charging`, and inferred rain binary sensors.
+- Includes TCP EOF recovery and the schedule action YAML without merge keys.
+
 ## 0.7.2 (experimental)
 
 - Treat an unexpected TCP EOF from the Miotlink bridge as a recoverable
   connection failure.
 - Reset the stale stream and retry the status query on a fresh socket instead
   of leaving the coordinator with an unexpected `IncompleteReadError`.
+- Removed YAML merge keys from the schedule action description to prevent
+  duplicate `name` warnings in Home Assistant 2026.8.
 
 ## 0.7.1 (experimental)
 
