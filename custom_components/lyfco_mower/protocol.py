@@ -16,7 +16,6 @@ _LOGGER = logging.getLogger(__name__)
 VSP_HEADER_SIZE = 20
 CONNECT_TIMEOUT = 10.0
 RESPONSE_TIMEOUT = 6.0
-HEARTBEAT_INTERVAL = 5.0
 EXTENDED_REFRESH_INTERVAL = 900.0
 INCOMPLETE_REFRESH_INTERVAL = 30.0
 EXTENDED_RESPONSE_TIMEOUT = 2.5
@@ -297,7 +296,6 @@ class LyfcoMowerClient:
         self.port = port
         self._reader: asyncio.StreamReader | None = None
         self._writer: asyncio.StreamWriter | None = None
-        self._heartbeat_task: asyncio.Task[None] | None = None
         self._lock = asyncio.Lock()
         self._firmware: str | None = None
         self._model: str | None = None
@@ -670,7 +668,7 @@ class LyfcoMowerClient:
         )
 
     async def async_close(self) -> None:
-        """Close the client and stop heartbeat."""
+        """Close the client connection."""
         async with self._lock:
             await self._async_reset_locked()
 
@@ -686,9 +684,6 @@ class LyfcoMowerClient:
             raise LyfcoConnectionError(
                 f"Unable to connect to {self.host}:{self.port}"
             ) from error
-        self._heartbeat_task = asyncio.create_task(
-            self._async_heartbeat_loop(), name=f"lyfco-heartbeat-{self.host}"
-        )
         return True
 
     async def _async_send_locked(self, payload: str) -> None:
@@ -867,29 +862,7 @@ class LyfcoMowerClient:
         self._pin_enabled = body[4] == "1"
         self._pin_checked = True
 
-    async def _async_heartbeat_loop(self) -> None:
-        try:
-            while True:
-                await asyncio.sleep(HEARTBEAT_INTERVAL)
-                async with self._lock:
-                    await self._async_send_locked("CodeName=Search")
-        except asyncio.CancelledError:
-            raise
-        except (OSError, LyfcoError) as error:
-            _LOGGER.debug("Lyfco heartbeat failed: %s", error)
-            writer = self._writer
-            self._reader = None
-            self._writer = None
-            if writer is not None:
-                writer.close()
-
     async def _async_reset_locked(self) -> None:
-        heartbeat = self._heartbeat_task
-        self._heartbeat_task = None
-        if heartbeat is not None and heartbeat is not asyncio.current_task():
-            heartbeat.cancel()
-            with suppress(asyncio.CancelledError):
-                await heartbeat
         writer = self._writer
         self._reader = None
         self._writer = None
