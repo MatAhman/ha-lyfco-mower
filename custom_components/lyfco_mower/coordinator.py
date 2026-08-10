@@ -39,7 +39,7 @@ class LyfcoCoordinator(DataUpdateCoordinator[MowerStatus]):
 
     async def _async_update_data(self) -> MowerStatus:
         try:
-            status = await self.client.async_get_status()
+            status = await self.client.async_get_status(dt_util.now())
         except LyfcoError as error:
             self._consecutive_update_failures += 1
             if self.data is not None and self._consecutive_update_failures <= 2:

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.5 (experimental)
+
+- Detect internal schedule starts from the configured weekday/start time and
+  the charging-voltage drop, so scheduled mowing changes the mower entity from
+  `Docked` to `Mowing` even though Home Assistant did not send a start command.
+- Added `@MatAhman` as the integration code owner in the manifest for Home
+  Assistant and HACS validation.
+
 ## 0.7.4 (experimental)
 
 - Prevented residual high battery voltage after leaving the charger from

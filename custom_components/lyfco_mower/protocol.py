@@ -20,6 +20,7 @@ HEARTBEAT_INTERVAL = 5.0
 EXTENDED_REFRESH_INTERVAL = 900.0
 INCOMPLETE_REFRESH_INTERVAL = 30.0
 EXTENDED_RESPONSE_TIMEOUT = 2.5
+SCHEDULE_START_WINDOW_MINUTES = 10
 
 
 class LyfcoError(Exception):
@@ -314,7 +315,9 @@ class LyfcoMowerClient:
         self._low_battery_seen_since_auto = False
         self._awaiting_voltage_drop = False
 
-    async def async_get_status(self) -> MowerStatus:
+    async def async_get_status(
+        self, local_time: datetime | None = None
+    ) -> MowerStatus:
         """Request status, reconnecting once if necessary."""
         async with self._lock:
             last_error: Exception | None = None
@@ -350,7 +353,7 @@ class LyfcoMowerClient:
                             # bridge closed the stream. Reset it now so the next
                             # core poll starts with a fresh TCP connection.
                             await self._async_reset_locked()
-                    status = self._infer_status(status)
+                    status = self._infer_status(status, local_time)
                     return replace(
                         status,
                         configuration=self._configuration,
@@ -578,7 +581,23 @@ class LyfcoMowerClient:
         # Y8 is a stateless blade toggle and does not establish mower motion.
         self._last_action = action
 
-    def _infer_status(self, status: MowerStatus) -> MowerStatus:
+    def _schedule_has_just_started(self, local_time: datetime | None) -> bool:
+        """Return whether local time is just after today's enabled start."""
+        if local_time is None:
+            return False
+        mower_day = (local_time.weekday() + 1) % 7
+        now_minutes = local_time.hour * 60 + local_time.minute
+        for schedule in self._schedules:
+            if schedule.day != mower_day or sum(schedule.area_minutes) == 0:
+                continue
+            hour, minute = (int(part) for part in schedule.start_time.split(":"))
+            elapsed = (now_minutes - (hour * 60 + minute)) % (24 * 60)
+            return elapsed < SCHEDULE_START_WINDOW_MINUTES
+        return False
+
+    def _infer_status(
+        self, status: MowerStatus, local_time: datetime | None = None
+    ) -> MowerStatus:
         """Combine voltage and the last command into a conservative state."""
         voltage_is_high = status.voltage >= CHARGING_VOLTAGE
         if self._awaiting_voltage_drop:
@@ -592,7 +611,29 @@ class LyfcoMowerClient:
             charging = False
         else:
             charging = voltage_is_high
-        source = "last_command" if self._activity is not None else None
+        source = (
+            "schedule_and_voltage"
+            if self._last_action == "schedule" and self._activity == "mowing"
+            else "last_command" if self._activity is not None else None
+        )
+
+        if (
+            self._docked_latched
+            and not charging
+            and not any(status.alarm_flags)
+            and self._schedule_has_just_started(local_time)
+        ):
+            # An internal schedule start does not produce a Y5 command on this
+            # TCP connection. A below-threshold sample shortly after today's
+            # configured start proves that the mower has left its remembered
+            # dock state, without treating ordinary charger maintenance as a
+            # scheduled departure later in the run window.
+            self._activity = "mowing"
+            self._last_action = "schedule"
+            self._docked_latched = False
+            self._rain_detected_inferred = False
+            source = "schedule_and_voltage"
+
         if self._last_action == "5":
             self._alarm_seen_since_auto |= any(status.alarm_flags)
             if len(status.alarm_flags) >= 3:
