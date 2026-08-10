@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.4 (experimental)
+
+- Prevented residual high battery voltage after leaving the charger from
+  incorrectly changing `Mowing` or `Returning` back to `Docked`.
+- Require a below-threshold voltage sample after a movement command before a
+  later high voltage can establish a new dock event.
+- Keep the last confirmed status through two transient polling failures and
+  report unavailable only on the third consecutive failure.
+- Reset a connection immediately after an optional extended-read failure and
+  reduce automatic area/schedule refreshes from five to fifteen minutes.
+- Restored repository validation files and corrected stale schedule wording in
+  the README.
+
 ## 0.7.3 (experimental)
 
 - Republished the complete status update with a new version so HACS cannot

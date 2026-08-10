@@ -45,7 +45,7 @@ newer. The icon is also included as a HACS brand asset.
   last verified command and measured voltage.
 - Inferred rain detection when an automatic run returns to charge without a
   home command, low-battery indication, or another alarm.
-- Read-only working-area configuration and seven weekday schedule sensors.
+- Read-only working-area configuration and seven editable weekday schedule rows.
 - Seven directly editable weekday rows displayed as `start - end` ranges.
 - Schedule editing through the `lyfco_mower.set_schedule` action with read-back verification.
 - Automatic mower-clock synchronization, including daylight-saving changes.
@@ -77,7 +77,7 @@ newer. The icon is also included as a HACS brand asset.
   integration extracts only model/firmware and never stores or logs the full response.
 - Working-area entities remain read-only. Schedules can be changed through a
   validated action and are read back after every write. Extended data is
-  refreshed at most once every five minutes after a complete read.
+  refreshed at most once every fifteen minutes after a complete read.
 
 ## Installation
 
@@ -148,8 +148,8 @@ Reserve the mower's new address in the router before adding it to Home Assistant
 
 Status is read using `W`; firmware is read using `V`. Working areas are read
 using `R`, and weekday schedules are read using `S0` through `S6` where day 0
-is Sunday. Each schedule sensor uses the start time as its state and exposes
-edge mowing plus minutes for areas 1–6 as attributes.
+is Sunday. Each editable schedule row exposes edge mowing plus minutes for
+areas 1–6 as attributes.
 
 ### Changing a schedule
 

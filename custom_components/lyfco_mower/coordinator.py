@@ -35,12 +35,26 @@ class LyfcoCoordinator(DataUpdateCoordinator[MowerStatus]):
         self.client = client
         self._clock_signature: tuple[object, ...] | None = None
         self._last_clock_attempt = 0.0
+        self._consecutive_update_failures = 0
 
     async def _async_update_data(self) -> MowerStatus:
         try:
             status = await self.client.async_get_status()
         except LyfcoError as error:
+            self._consecutive_update_failures += 1
+            if self.data is not None and self._consecutive_update_failures <= 2:
+                # The mower's Miotlink bridge occasionally drops one or two
+                # polls and then recovers. Preserve the last confirmed state
+                # during that short window; a third failure still makes the
+                # coordinator unavailable in the normal Home Assistant way.
+                _LOGGER.debug(
+                    "Keeping last mower status after transient failure %s/2: %s",
+                    self._consecutive_update_failures,
+                    error,
+                )
+                return self.data
             raise UpdateFailed(str(error)) from error
+        self._consecutive_update_failures = 0
         await self.async_sync_clock()
         return status
 

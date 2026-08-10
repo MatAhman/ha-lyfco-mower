@@ -17,7 +17,7 @@ VSP_HEADER_SIZE = 20
 CONNECT_TIMEOUT = 10.0
 RESPONSE_TIMEOUT = 6.0
 HEARTBEAT_INTERVAL = 5.0
-EXTENDED_REFRESH_INTERVAL = 300.0
+EXTENDED_REFRESH_INTERVAL = 900.0
 INCOMPLETE_REFRESH_INTERVAL = 30.0
 EXTENDED_RESPONSE_TIMEOUT = 2.5
 
@@ -312,6 +312,7 @@ class LyfcoMowerClient:
         self._rain_detected_inferred = False
         self._alarm_seen_since_auto = False
         self._low_battery_seen_since_auto = False
+        self._awaiting_voltage_drop = False
 
     async def async_get_status(self) -> MowerStatus:
         """Request status, reconnecting once if necessary."""
@@ -345,6 +346,10 @@ class LyfcoMowerClient:
                             # Extended data is optional; never make core status
                             # unavailable merely because an R/S reply was lost.
                             _LOGGER.debug("Lyfco extended read failed: %s", error)
+                            # A failed optional read often means the Miotlink
+                            # bridge closed the stream. Reset it now so the next
+                            # core poll starts with a fresh TCP connection.
+                            await self._async_reset_locked()
                     status = self._infer_status(status)
                     return replace(
                         status,
@@ -554,24 +559,39 @@ class LyfcoMowerClient:
             self._rain_detected_inferred = False
             self._alarm_seen_since_auto = False
             self._low_battery_seen_since_auto = False
+            self._awaiting_voltage_drop = True
         elif action == "7":
             self._activity = "returning"
             self._docked_latched = False
             self._rain_detected_inferred = False
+            self._awaiting_voltage_drop = True
         elif action == "6":
             self._activity = "paused"
             self._docked_latched = False
             self._rain_detected_inferred = False
+            self._awaiting_voltage_drop = True
         elif action in {"1", "2", "3", "4"}:
             self._activity = "mowing"
             self._docked_latched = False
             self._rain_detected_inferred = False
+            self._awaiting_voltage_drop = True
         # Y8 is a stateless blade toggle and does not establish mower motion.
         self._last_action = action
 
     def _infer_status(self, status: MowerStatus) -> MowerStatus:
         """Combine voltage and the last command into a conservative state."""
-        charging = status.voltage >= CHARGING_VOLTAGE
+        voltage_is_high = status.voltage >= CHARGING_VOLTAGE
+        if self._awaiting_voltage_drop:
+            # A battery remains above the charging threshold briefly after the
+            # mower leaves its station. Do not let that residual voltage
+            # overwrite MOWING/RETURNING with DOCKED. Dock detection is armed
+            # again only after one below-threshold sample proves that the mower
+            # has left the charging state.
+            if not voltage_is_high:
+                self._awaiting_voltage_drop = False
+            charging = False
+        else:
+            charging = voltage_is_high
         source = "last_command" if self._activity is not None else None
         if self._last_action == "5":
             self._alarm_seen_since_auto |= any(status.alarm_flags)
