@@ -126,6 +126,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: LyfcoConfigEntry) -> boo
         if obsolete_schedule_sensor or obsolete_blade_switch:
             registry.async_remove(entity.entity_id)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    coordinator.async_start_schedule_tracker()
     return True
 
 
@@ -133,5 +134,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: LyfcoConfigEntry) -> bo
     """Unload a config entry."""
     if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False
+    entry.runtime_data.coordinator.async_stop_schedule_tracker()
     await entry.runtime_data.client.async_close()
     return True
