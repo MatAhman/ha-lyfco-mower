@@ -47,4 +47,12 @@ ALARM_UNIQUE_KEYS = (
     "mower_stuck",
 )
 
+# Empirical voltage model for the e1750/M10 charging station.
+# 26.4 V remains the conservative level that proves charger contact after the
+# mower has first been seen below it when leaving the station. Once docked, the
+# mower repeatedly charges to about 30 V, backs off the contacts above 29.5 V,
+# lets the battery fall to about 28.6 V, then drives forward and charges again.
 CHARGING_VOLTAGE = 26.4
+CHARGE_BACKOFF_VOLTAGE = 29.5
+CHARGE_RECONNECT_VOLTAGE = 28.6
+VOLTAGE_TREND_EPSILON = 0.02
