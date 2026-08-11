@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.7.6 (experimental)
+
+- Model the measured dock maintenance cycle separately from logical dock state:
+  charging rises toward about 30 V, the mower backs off above 29.5 V, reconnects
+  around 28.6 V, and remains logically docked throughout that cycle.
+- Use Home Assistant's local clock and the mower's stored weekly schedule to set
+  `Mowing` at the configured start minute and `Returning` at the calculated end
+  minute when the mower has communicated successfully within the last 75 seconds
+  and no alarm is active.
+- Keep real alarms and measured dock/charging behavior above schedule inference.
+- Detect a mid-schedule return to the charger and keep the mower `Docked` while it
+  charges, even though the configured schedule is still active.
+- Detect a likely mid-schedule resume after two consecutive falling voltage samples
+  at or below the measured 28.6 V reconnect level, then return Home Assistant to
+  `Mowing` until another real dock event is observed.
+- Keep explicit Home Assistant pause/return commands above schedule inference.
+- Restore the proven `CodeName=Search` TCP heartbeat every five seconds after the
+  experimental 0x1A heartbeat proved less stable on the tested mower.
+
 ## 0.7.5 (experimental)
 
 - Detect internal schedule starts from the configured weekday/start time and
