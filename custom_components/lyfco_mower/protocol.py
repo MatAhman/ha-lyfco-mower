@@ -28,6 +28,8 @@ EXTENDED_REFRESH_INTERVAL = 900.0
 INCOMPLETE_REFRESH_INTERVAL = 30.0
 EXTENDED_RESPONSE_TIMEOUT = 2.5
 SCHEDULE_START_WINDOW_MINUTES = 10
+RETURN_DOCK_RISE_SAMPLES = 3
+RETURN_DOCK_RISE_MIN_TOTAL = 0.10
 
 
 class LyfcoError(Exception):
@@ -323,6 +325,8 @@ class LyfcoMowerClient:
         self._alarm_seen_since_auto = False
         self._low_battery_seen_since_auto = False
         self._awaiting_voltage_drop = False
+        self._return_rise_samples = 0
+        self._return_rise_start_voltage: float | None = None
 
     async def async_get_status(
         self, local_time: datetime | None = None
@@ -547,6 +551,8 @@ class LyfcoMowerClient:
 
     def _record_action(self, action: str) -> None:
         """Remember a verified action for the next inferred status update."""
+        self._return_rise_samples = 0
+        self._return_rise_start_voltage = None
         if action == "0":
             self._activity = "paused"
         elif action == "5":
@@ -601,10 +607,41 @@ class LyfcoMowerClient:
             None if previous_voltage is None else status.voltage - previous_voltage
         )
 
+        dock_candidate = False
         if self._awaiting_voltage_drop:
             if not dock_voltage_present:
                 self._awaiting_voltage_drop = False
-            dock_candidate = False
+                self._return_rise_samples = 0
+                self._return_rise_start_voltage = None
+            elif (
+                self._last_action == "7"
+                and self._activity == "returning"
+                and previous_voltage is not None
+                and voltage_delta is not None
+            ):
+                # A return command can reach the charger while the battery is
+                # still above the old 26.4 V residual-voltage guard. Detect the
+                # sustained charging rise instead of waiting forever for a
+                # below-threshold sample that may never occur.
+                if voltage_delta >= VOLTAGE_TREND_EPSILON:
+                    if self._return_rise_samples == 0:
+                        self._return_rise_start_voltage = previous_voltage
+                    self._return_rise_samples += 1
+                    rise_start = self._return_rise_start_voltage
+                    total_rise = (
+                        0.0 if rise_start is None else status.voltage - rise_start
+                    )
+                    if (
+                        self._return_rise_samples >= RETURN_DOCK_RISE_SAMPLES
+                        and total_rise >= RETURN_DOCK_RISE_MIN_TOTAL
+                    ):
+                        self._awaiting_voltage_drop = False
+                        dock_candidate = True
+                        self._return_rise_samples = 0
+                        self._return_rise_start_voltage = None
+                elif voltage_delta <= -VOLTAGE_TREND_EPSILON:
+                    self._return_rise_samples = 0
+                    self._return_rise_start_voltage = None
         else:
             dock_candidate = dock_voltage_present
 
