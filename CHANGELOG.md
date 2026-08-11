@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.7 (experimental)
+
+- Fix an explicit `Return to charger` (`Y7`) getting stuck as `Returning` with
+  `Charging = off` when the mower reached the dock before battery voltage had
+  fallen below the old 26.4 V residual-voltage guard.
+- While an explicit return is active, recognize real charger contact from a
+  sustained voltage rise: at least three significant rising samples with a
+  combined rise of at least 0.10 V. Once confirmed, normal dock/charging-cycle
+  inference takes over immediately.
+- Keep the existing residual-voltage protection for mowing/manual departures,
+  so a still-high battery voltage after leaving the dock cannot by itself create
+  a false dock state.
+
 ## 0.7.6 (experimental)
 
 - Model the measured dock maintenance cycle separately from logical dock state:
