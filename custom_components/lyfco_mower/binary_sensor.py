@@ -11,7 +11,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import LyfcoConfigEntry
-from .const import ALARM_KEYS, ALARM_UNIQUE_KEYS, CHARGING_VOLTAGE
+from .const import (
+    ALARM_KEYS,
+    ALARM_UNIQUE_KEYS,
+    CHARGE_BACKOFF_VOLTAGE,
+    CHARGE_RECONNECT_VOLTAGE,
+    CHARGING_VOLTAGE,
+)
 from .entity import LyfcoEntity
 
 
@@ -58,7 +64,7 @@ class LyfcoDockedBinarySensor(LyfcoEntity, BinarySensorEntity):
 
 
 class LyfcoChargingBinarySensor(LyfcoEntity, BinarySensorEntity):
-    """Expose active charging inferred from measured machine voltage."""
+    """Expose active charging inferred from the measured dock cycle."""
 
     _attr_translation_key = "charging"
     _attr_device_class = BinarySensorDeviceClass.BATTERY_CHARGING
@@ -74,7 +80,9 @@ class LyfcoChargingBinarySensor(LyfcoEntity, BinarySensorEntity):
     def extra_state_attributes(self) -> dict[str, object]:
         return {
             "inferred": True,
-            "threshold_voltage": CHARGING_VOLTAGE,
+            "dock_detect_voltage": CHARGING_VOLTAGE,
+            "backoff_voltage": CHARGE_BACKOFF_VOLTAGE,
+            "reconnect_voltage": CHARGE_RECONNECT_VOLTAGE,
             "machine_voltage": self.coordinator.data.voltage,
         }
 
