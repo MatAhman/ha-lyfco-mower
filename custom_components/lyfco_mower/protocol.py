@@ -16,6 +16,7 @@ _LOGGER = logging.getLogger(__name__)
 VSP_HEADER_SIZE = 20
 CONNECT_TIMEOUT = 10.0
 RESPONSE_TIMEOUT = 6.0
+HEARTBEAT_INTERVAL = 10.0
 EXTENDED_REFRESH_INTERVAL = 900.0
 INCOMPLETE_REFRESH_INTERVAL = 30.0
 EXTENDED_RESPONSE_TIMEOUT = 2.5
@@ -118,6 +119,23 @@ def build_vsp(payload: str) -> bytes:
     frame[15] = 1
     frame[VSP_HEADER_SIZE:] = raw
     for index in range(8, total):
+        frame[index] ^= 0x30
+    return bytes(frame)
+
+
+def build_heartbeat(counter: int, unix_time: int | None = None) -> bytes:
+    """Build the 20-byte VSP 0x1A heartbeat used by the original app."""
+    if unix_time is None:
+        unix_time = int(time.time())
+
+    frame = bytearray(VSP_HEADER_SIZE)
+    frame[0:2] = b"0h"
+    frame[2:4] = VSP_HEADER_SIZE.to_bytes(2, "big")
+    frame[8] = 0x1A
+    frame[10:12] = (VSP_HEADER_SIZE - 8).to_bytes(2, "big")
+    frame[12:16] = (counter & 0xFFFFFFFF).to_bytes(4, "little")
+    frame[16:20] = (unix_time & 0xFFFFFFFF).to_bytes(4, "little")
+    for index in range(8, VSP_HEADER_SIZE):
         frame[index] ^= 0x30
     return bytes(frame)
 
@@ -296,6 +314,8 @@ class LyfcoMowerClient:
         self.port = port
         self._reader: asyncio.StreamReader | None = None
         self._writer: asyncio.StreamWriter | None = None
+        self._heartbeat_task: asyncio.Task[None] | None = None
+        self._heartbeat_counter = 0
         self._lock = asyncio.Lock()
         self._firmware: str | None = None
         self._model: str | None = None
@@ -668,7 +688,7 @@ class LyfcoMowerClient:
         )
 
     async def async_close(self) -> None:
-        """Close the client connection."""
+        """Close the client and stop heartbeat."""
         async with self._lock:
             await self._async_reset_locked()
 
@@ -684,13 +704,19 @@ class LyfcoMowerClient:
             raise LyfcoConnectionError(
                 f"Unable to connect to {self.host}:{self.port}"
             ) from error
+        self._heartbeat_task = asyncio.create_task(
+            self._async_heartbeat_loop(), name=f"lyfco-heartbeat-{self.host}"
+        )
         return True
 
-    async def _async_send_locked(self, payload: str) -> None:
+    async def _async_send_frame_locked(self, frame: bytes) -> None:
         if self._writer is None or self._writer.is_closing():
             raise LyfcoConnectionError("TCP connection is closed")
-        self._writer.write(build_vsp(payload))
+        self._writer.write(frame)
         await self._writer.drain()
+
+    async def _async_send_locked(self, payload: str) -> None:
+        await self._async_send_frame_locked(build_vsp(payload))
 
     async def _async_send_command_locked(self, mark: str, body: str = "") -> None:
         await self._async_send_locked(_uart_envelope(build_command(mark, body)))
@@ -862,7 +888,32 @@ class LyfcoMowerClient:
         self._pin_enabled = body[4] == "1"
         self._pin_checked = True
 
+    async def _async_heartbeat_loop(self) -> None:
+        try:
+            while True:
+                await asyncio.sleep(HEARTBEAT_INTERVAL)
+                async with self._lock:
+                    self._heartbeat_counter = (self._heartbeat_counter + 1) & 0xFFFFFFFF
+                    await self._async_send_frame_locked(
+                        build_heartbeat(self._heartbeat_counter)
+                    )
+        except asyncio.CancelledError:
+            raise
+        except (OSError, LyfcoError) as error:
+            _LOGGER.debug("Lyfco VSP heartbeat failed: %s", error)
+            writer = self._writer
+            self._reader = None
+            self._writer = None
+            if writer is not None:
+                writer.close()
+
     async def _async_reset_locked(self) -> None:
+        heartbeat = self._heartbeat_task
+        self._heartbeat_task = None
+        if heartbeat is not None and heartbeat is not asyncio.current_task():
+            heartbeat.cancel()
+            with suppress(asyncio.CancelledError):
+                await heartbeat
         writer = self._writer
         self._reader = None
         self._writer = None
