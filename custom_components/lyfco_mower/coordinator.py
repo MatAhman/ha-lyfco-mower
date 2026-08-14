@@ -17,9 +17,9 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .beta5_client import Beta5MowerClient
+from .beta5_state import Beta5FinalStateMachine
 from .const import DOMAIN
 from .protocol import LyfcoError, MowerSchedule, MowerStatus
-from .state_machine import Beta5StateMachine
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ class LyfcoCoordinator(DataUpdateCoordinator[MowerStatus]):
             update_interval=timedelta(seconds=NORMAL_POLL_SECONDS),
         )
         self.client = client
-        self.state_machine = Beta5StateMachine()
+        self.state_machine = Beta5FinalStateMachine()
 
         self._clock_signature: tuple[object, ...] | None = None
         self._last_clock_attempt = 0.0
@@ -149,8 +149,6 @@ class LyfcoCoordinator(DataUpdateCoordinator[MowerStatus]):
 
         now_utc = datetime.now(timezone.utc)
 
-        # A verified Y command is stronger than schedule expectation and is
-        # consumed exactly once through the revision counter.
         if self.client.command_revision != self._command_revision_seen:
             self._command_revision_seen = self.client.command_revision
             if self.state_machine.note_command(
