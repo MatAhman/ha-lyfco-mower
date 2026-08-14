@@ -16,7 +16,7 @@
   "services": {
     "set_schedule": {
       "name": "Ställ in veckodagsschema",
-      "description": "Ställ in schemat för en veckodag och kontrollera det genom återläsning.",
+      "description": "Ställ in schemat för en veckodag och kontrollera det med upp till tre återläsningar.",
       "fields": {
         "config_entry_id": {"name": "Klippare", "description": "Välj den konfigurerade klipparen."},
         "day": {"name": "Veckodag"},
@@ -36,6 +36,8 @@
       "runtime_hours": {"name": "Total klipptid"},
       "charge_hours": {"name": "Total laddtid"},
       "voltage": {"name": "Maskinspänning"},
+      "battery_estimated": {"name": "Batterinivå (estimerad)"},
+      "current_charging_minutes": {"name": "Aktuell laddtid"},
       "active_alarms": {"name": "Antal aktiva larm"},
       "firmware": {"name": "Firmware"},
       "working_areas": {"name": "Aktiverade arbetsområden"}
