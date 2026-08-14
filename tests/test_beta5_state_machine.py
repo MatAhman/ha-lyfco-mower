@@ -33,7 +33,15 @@ final_spec.loader.exec_module(final_module)
 Machine = final_module.Beta5FinalStateMachine
 
 
-def _update(machine, voltage, seconds, *, active=True, started=False, ended=False):
+def _update(
+    machine,
+    voltage,
+    seconds,
+    *,
+    active=True,
+    started=False,
+    ended=False,
+):
     base = datetime(2026, 8, 14, 9, 0, tzinfo=timezone.utc)
     machine.update(
         voltage=voltage,
@@ -106,3 +114,63 @@ def test_scheduled_start_from_dock_waits_for_departure_evidence():
     assert machine.docked is False
     assert machine.activity == "mowing"
     assert machine.source == "schedule_departure_voltage"
+
+
+def test_charge_learning_cycle_persists_and_summarizes():
+    learning_module = sys.modules[f"{PKG}.charge_learning"]
+    learning = learning_module.ChargeCycleLearning()
+    base = datetime(2026, 8, 14, 12, 0, tzinfo=timezone.utc)
+
+    learning.observe(
+        docked=True,
+        charging=True,
+        voltage=28.8,
+        now_mono=0.0,
+        now_utc=base,
+        reason="confirmed_return_charge_rise_after_settle",
+    )
+    learning.observe(
+        docked=True,
+        charging=True,
+        voltage=30.15,
+        now_mono=600.0,
+        now_utc=base + timedelta(seconds=600),
+        reason="charge_cycle_charging",
+    )
+    learning.observe(
+        docked=True,
+        charging=False,
+        voltage=29.0,
+        now_mono=900.0,
+        now_utc=base + timedelta(seconds=900),
+        reason="charge_cycle_backoff",
+    )
+    learning.observe(
+        docked=True,
+        charging=False,
+        voltage=28.73,
+        now_mono=1080.0,
+        now_utc=base + timedelta(seconds=1080),
+        reason="charge_cycle_backoff",
+    )
+    learning.observe(
+        docked=True,
+        charging=True,
+        voltage=29.1,
+        now_mono=1200.0,
+        now_utc=base + timedelta(seconds=1200),
+        reason="charge_cycle_charging",
+    )
+
+    assert len(learning.completed_cycles) == 1
+    cycle = learning.completed_cycles[0]
+    assert cycle["peak_voltage"] == 30.15
+    assert cycle["bottom_voltage"] == 28.73
+    assert cycle["charging_duration_seconds"] == 900.0
+    assert cycle["backoff_duration_seconds"] == 300.0
+    assert learning.learning_summary()["cycles_observed"] == 1
+
+    restored = learning_module.ChargeCycleLearning()
+    restored.load_persistent(learning.export_persistent())
+    assert len(restored.completed_cycles) == 1
+    assert restored.learning_summary()["peak_voltage"]["max"] == 30.15
