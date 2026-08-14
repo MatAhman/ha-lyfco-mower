@@ -1,7 +1,10 @@
 # Changelog
 
-## 0.7.8-beta.5 (experimental)
+## 1.0.0
 
+- Promote the field-tested `0.7.8-beta.5` code to the first stable release.
+- No mower-control or state-machine behavior was changed between beta.5 and 1.0.0;
+  only release/version metadata and diagnostics labeling were updated.
 - Replace schedule-dominant activity inference with a single final state machine
   shared by the mower, Docked and Charging entities.
 - Never accept 26.4 V or any other absolute voltage alone as proof of docking.
@@ -26,8 +29,6 @@
   charging counter remains available in whole hours.
 - Verify schedule writes with up to three read-back attempts and include requested
   and returned values in diagnostics.
-- Remove the README paragraph that explains the integration icon and update the
-  status limitations to describe trend-based beta.5 inference.
 
 ## 0.7.7 (experimental)
 
