@@ -1,46 +1,46 @@
-"""Data coordinator for Lyfco mower."""
+"""Data coordinator for Lyfco mower beta.5."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import logging
 import time
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_change
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .const import (
-    CHARGE_RECONNECT_VOLTAGE,
-    CHARGING_VOLTAGE,
-    DOMAIN,
-    POLL_INTERVAL,
-    VOLTAGE_TREND_EPSILON,
-)
-from .protocol import LyfcoError, LyfcoMowerClient, MowerSchedule, MowerStatus
+from .beta5_client import Beta5MowerClient
+from .const import DOMAIN
+from .protocol import LyfcoError, MowerSchedule, MowerStatus
+from .state_machine import Beta5StateMachine
 
 _LOGGER = logging.getLogger(__name__)
 
-WEEK_MINUTES = 7 * 24 * 60
+NORMAL_POLL_SECONDS = 30
+FAST_POLL_SECONDS = 10
+FAST_POLL_WINDOW_SECONDS = 180
 SCHEDULE_ONLINE_MAX_AGE = 75.0
-SCHEDULE_START_GRACE = 120.0
-SCHEDULE_DEPARTURE_CONFIRMATIONS = 2
-SCHEDULE_REDOCK_RISE = 0.15
+WEEK_MINUTES = 7 * 24 * 60
+
+STORAGE_VERSION = 1
 
 
 def _mower_weekday(local_time: datetime) -> int:
-    """Return the mower weekday number where Sunday is 0."""
+    """Return mower weekday number where Sunday is 0."""
     return (local_time.weekday() + 1) % 7
 
 
 def _schedule_state(
     schedules: tuple[MowerSchedule, ...], local_time: datetime
 ) -> tuple[bool, bool, bool]:
-    """Return active, starts-now and ends-now for the configured weekly schedule."""
+    """Return active, starts-now and ends-now for the weekly schedule."""
     now_week_minute = (
         _mower_weekday(local_time) * 24 * 60
         + local_time.hour * 60
@@ -66,46 +66,75 @@ def _schedule_state(
 
 
 class LyfcoCoordinator(DataUpdateCoordinator[MowerStatus]):
-    """Poll status while adding Home Assistant schedule-aware activity inference."""
+    """Poll mower data and produce the single beta.5 final activity state."""
 
     def __init__(
         self,
         hass: HomeAssistant,
         entry: ConfigEntry,
-        client: LyfcoMowerClient,
+        client: Beta5MowerClient,
     ) -> None:
         super().__init__(
             hass,
             _LOGGER,
             config_entry=entry,
             name=DOMAIN,
-            update_interval=POLL_INTERVAL,
+            update_interval=timedelta(seconds=NORMAL_POLL_SECONDS),
         )
         self.client = client
+        self.state_machine = Beta5StateMachine()
+
         self._clock_signature: tuple[object, ...] | None = None
         self._last_clock_attempt = 0.0
+
         self._consecutive_update_failures = 0
         self._last_real_success = 0.0
+        self._connection_state = "starting"
+
         self._schedule_unsub: Callable[[], None] | None = None
-        self._schedule_override: str | None = None
-        self._schedule_override_started = 0.0
-        self._schedule_departure_samples = 0
-        self._schedule_departure_evidence = False
-        self._schedule_seen_below_dock_voltage = False
         self._schedule_was_active = False
-        self._previous_voltage: float | None = None
+
+        self._command_revision_seen = client.command_revision
+
+        self._fast_poll_until = 0.0
+        self._fast_poll_reason: str | None = None
+
+        self._store: Store[dict[str, Any]] = Store(
+            hass,
+            STORAGE_VERSION,
+            f"{DOMAIN}.beta5.{entry.entry_id}",
+        )
+        self._learning_loaded = False
+
+    async def async_load_persistent_state(self) -> None:
+        """Load completed charge/mowing history retained across reloads."""
+        try:
+            stored = await self._store.async_load()
+        except Exception as error:  # storage failure must not block mower setup
+            _LOGGER.warning("Could not load Lyfco beta.5 state history: %s", error)
+            return
+        if isinstance(stored, dict):
+            self.state_machine.load_persistent(stored)
+            self._learning_loaded = True
+
+    async def async_shutdown(self) -> None:
+        """Persist diagnostic history before unload."""
+        try:
+            await self._store.async_save(self.state_machine.export_persistent())
+        except Exception as error:
+            _LOGGER.debug("Could not save Lyfco beta.5 state history: %s", error)
 
     async def _async_update_data(self) -> MowerStatus:
+        now_mono = time.monotonic()
+        self._update_poll_mode(now_mono)
         local_time = dt_util.now()
+
         try:
-            status = await self.client.async_get_status(local_time)
+            raw_status = await self.client.async_get_status(local_time)
         except LyfcoError as error:
             self._consecutive_update_failures += 1
+            self._connection_state = "recovering"
             if self.data is not None and self._consecutive_update_failures <= 2:
-                # Preserve the last confirmed state for two transient bridge
-                # failures, but do not refresh _last_real_success. Schedule
-                # clock events therefore cannot mistake cached data for an
-                # online mower.
                 _LOGGER.debug(
                     "Keeping last mower status after transient failure %s/2: %s",
                     self._consecutive_update_failures,
@@ -115,13 +144,85 @@ class LyfcoCoordinator(DataUpdateCoordinator[MowerStatus]):
             raise UpdateFailed(str(error)) from error
 
         self._consecutive_update_failures = 0
-        self._last_real_success = time.monotonic()
-        status = self._apply_schedule_overlay(status, local_time)
+        self._last_real_success = now_mono
+        self._connection_state = "connected"
+
+        now_utc = datetime.now(timezone.utc)
+
+        # A verified Y command is stronger than schedule expectation and is
+        # consumed exactly once through the revision counter.
+        if self.client.command_revision != self._command_revision_seen:
+            self._command_revision_seen = self.client.command_revision
+            if self.state_machine.note_command(
+                self.client.last_action,
+                now_mono=now_mono,
+                now_utc=now_utc,
+                voltage=raw_status.voltage,
+            ):
+                self._enter_fast_poll("verified_command")
+
+        active, starts_now, ends_now = _schedule_state(
+            raw_status.schedules, local_time
+        )
+        was_active = self._schedule_was_active
+        schedule_started = starts_now
+        schedule_ended = ends_now or (was_active and not active)
+        self._schedule_was_active = active
+
+        state_changed = self.state_machine.update(
+            voltage=raw_status.voltage,
+            alarm_flags=raw_status.alarm_flags,
+            raw_docked=raw_status.docked,
+            raw_charging=raw_status.charging,
+            schedule_active=active,
+            schedule_started=schedule_started,
+            schedule_ended=schedule_ended,
+            now_mono=now_mono,
+            now_utc=now_utc,
+        )
+        if state_changed:
+            self._enter_fast_poll("state_transition")
+
+        final_status = replace(
+            raw_status,
+            inferred_activity=self.state_machine.activity,
+            docked=self.state_machine.docked,
+            charging=self.state_machine.charging,
+            rain_detected_inferred=(
+                raw_status.rain_detected_inferred and self.state_machine.docked
+            ),
+            inference_source=self.state_machine.source,
+        )
+
+        if self.state_machine.pop_persistent_dirty():
+            try:
+                await self._store.async_save(
+                    self.state_machine.export_persistent()
+                )
+            except Exception as error:
+                _LOGGER.debug("Could not persist Lyfco beta.5 history: %s", error)
+
         await self.async_sync_clock()
-        return status
+        return final_status
+
+    def _enter_fast_poll(self, reason: str) -> None:
+        """Poll at 10 s for three minutes after meaningful activity."""
+        self._fast_poll_until = max(
+            self._fast_poll_until,
+            time.monotonic() + FAST_POLL_WINDOW_SECONDS,
+        )
+        self._fast_poll_reason = reason
+        self.update_interval = timedelta(seconds=FAST_POLL_SECONDS)
+
+    def _update_poll_mode(self, now_mono: float) -> None:
+        if now_mono < self._fast_poll_until:
+            self.update_interval = timedelta(seconds=FAST_POLL_SECONDS)
+            return
+        self.update_interval = timedelta(seconds=NORMAL_POLL_SECONDS)
+        self._fast_poll_reason = None
 
     def async_start_schedule_tracker(self) -> None:
-        """Track local minute boundaries used by the mower's internal schedule."""
+        """Track exact minute boundaries without optimistically forcing state."""
         if self._schedule_unsub is not None:
             return
         self._schedule_unsub = async_track_time_change(
@@ -131,7 +232,6 @@ class LyfcoCoordinator(DataUpdateCoordinator[MowerStatus]):
         )
 
     def async_stop_schedule_tracker(self) -> None:
-        """Stop the Home Assistant schedule clock listener."""
         if self._schedule_unsub is None:
             return
         self._schedule_unsub()
@@ -139,11 +239,10 @@ class LyfcoCoordinator(DataUpdateCoordinator[MowerStatus]):
 
     @callback
     def _handle_schedule_minute(self, local_time: datetime) -> None:
-        """Schedule asynchronous handling at each local minute boundary."""
         self.hass.async_create_task(self._async_handle_schedule_minute(local_time))
 
     async def _async_handle_schedule_minute(self, local_time: datetime) -> None:
-        """Apply an exact schedule start/end only when the mower is recently online."""
+        """Refresh promptly at a schedule boundary; do not invent movement."""
         status = self.data
         if status is None or any(status.alarm_flags):
             return
@@ -153,218 +252,22 @@ class LyfcoCoordinator(DataUpdateCoordinator[MowerStatus]):
         ):
             return
 
-        active, starts_now, ends_now = _schedule_state(status.schedules, local_time)
-
-        # A simultaneous end/start (for overlapping schedule rows) is treated
-        # as an active start, because the mower is still expected to work.
-        if starts_now:
-            self._schedule_override = "mowing"
-            self._schedule_override_started = time.monotonic()
-            self._schedule_departure_samples = 0
-            self._schedule_departure_evidence = False
-            self._schedule_seen_below_dock_voltage = False
-            self._schedule_was_active = True
-            self.async_set_updated_data(
-                replace(
-                    status,
-                    inferred_activity="mowing",
-                    docked=False,
-                    charging=False,
-                    inference_source="schedule_clock_start",
-                )
-            )
-            return
-
-        if ends_now:
-            self._schedule_was_active = active
-            self._schedule_departure_samples = 0
-            self._schedule_departure_evidence = False
-            self._schedule_seen_below_dock_voltage = False
-            if status.docked:
-                self._schedule_override = None
-                return
-            self._schedule_override = "returning"
-            self._schedule_override_started = time.monotonic()
-            self.async_set_updated_data(
-                replace(
-                    status,
-                    inferred_activity="returning",
-                    docked=False,
-                    charging=False,
-                    inference_source="schedule_clock_end",
-                )
-            )
-
-    def _apply_schedule_overlay(
-        self, status: MowerStatus, local_time: datetime
-    ) -> MowerStatus:
-        """Combine schedule expectation with real alarms and measured dock behavior."""
-        active, _starts_now, _ends_now = _schedule_state(
+        _active, starts_now, ends_now = _schedule_state(
             status.schedules, local_time
         )
-        was_active = self._schedule_was_active
-        self._schedule_was_active = active
-
-        previous_voltage = self._previous_voltage
-        voltage_delta = (
-            None if previous_voltage is None else status.voltage - previous_voltage
-        )
-        self._previous_voltage = status.voltage
-
-        # Real alarms always outrank schedule inference.
-        if any(status.alarm_flags):
-            self._schedule_override = None
-            self._schedule_departure_samples = 0
-            self._schedule_departure_evidence = False
-            self._schedule_seen_below_dock_voltage = False
-            return status
-
-        # An explicit Home Assistant pause/home command outranks the schedule.
-        if (
-            status.inference_source == "last_command"
-            and status.inferred_activity in {"paused", "returning"}
-        ):
-            self._schedule_override = None
-            self._schedule_departure_samples = 0
-            return status
-
-        if self._schedule_override == "returning":
-            # Measured docking wins as soon as the mower reaches the charger.
-            if status.docked:
-                self._schedule_override = None
-                return status
-            return replace(
-                status,
-                inferred_activity="returning",
-                docked=False,
-                charging=False,
-                inference_source="schedule_clock_end",
+        if starts_now or ends_now:
+            self._enter_fast_poll(
+                "schedule_start" if starts_now else "schedule_end"
             )
+            await self.async_request_refresh()
 
-        if active:
-            if self._schedule_override == "mowing":
-                # Evidence that the mower really left the dock. A falling sample
-                # at/below the measured 28.6 V reconnect level is enough to keep
-                # the scheduled-start assumption alive; falling below 26.4 V is
-                # stronger evidence and arms detection of the next real dock.
-                if (
-                    voltage_delta is not None
-                    and status.voltage <= CHARGE_RECONNECT_VOLTAGE
-                    and voltage_delta <= -VOLTAGE_TREND_EPSILON
-                ):
-                    self._schedule_departure_evidence = True
-                if status.voltage < CHARGING_VOLTAGE:
-                    self._schedule_departure_evidence = True
-                    self._schedule_seen_below_dock_voltage = True
+    @property
+    def current_charging_minutes(self) -> float:
+        return self.state_machine.current_charging_minutes(time.monotonic())
 
-                # After a confirmed departure, a fresh voltage rise back into
-                # the charging range means the mower has returned during the
-                # still-active schedule. Real docking then outranks "mowing".
-                crossed_back_to_dock = (
-                    self._schedule_seen_below_dock_voltage
-                    and previous_voltage is not None
-                    and previous_voltage < CHARGING_VOLTAGE <= status.voltage
-                )
-                strong_redock_rise = (
-                    self._schedule_departure_evidence
-                    and status.docked
-                    and voltage_delta is not None
-                    and voltage_delta >= SCHEDULE_REDOCK_RISE
-                    and status.voltage >= CHARGE_RECONNECT_VOLTAGE
-                )
-                if crossed_back_to_dock or strong_redock_rise:
-                    self._schedule_override = None
-                    self._schedule_departure_samples = 0
-                    return replace(
-                        status,
-                        inferred_activity="docked",
-                        docked=True,
-                        inference_source="schedule_midrun_dock",
-                    )
-
-                # If the expected schedule start never produces any departure
-                # evidence, stop pretending after two minutes and trust the
-                # measured dock state (for example if the mower refused to run).
-                if (
-                    not self._schedule_departure_evidence
-                    and status.docked
-                    and time.monotonic() - self._schedule_override_started
-                    >= SCHEDULE_START_GRACE
-                ):
-                    self._schedule_override = None
-                    return status
-
-                return replace(
-                    status,
-                    inferred_activity="mowing",
-                    docked=False,
-                    charging=False,
-                    inference_source="schedule_clock_active",
-                )
-
-            if status.docked:
-                # During an active schedule the mower may go home for charging.
-                # Its normal dock maintenance also falls through 28.6 V before
-                # reconnecting. Require two consecutive falling samples at or
-                # below that level before calling it a genuine departure/resume.
-                if (
-                    voltage_delta is not None
-                    and status.voltage <= CHARGE_RECONNECT_VOLTAGE
-                    and voltage_delta <= -VOLTAGE_TREND_EPSILON
-                ):
-                    self._schedule_departure_samples += 1
-                elif (
-                    voltage_delta is not None
-                    and voltage_delta >= VOLTAGE_TREND_EPSILON
-                ) or status.voltage > CHARGE_RECONNECT_VOLTAGE:
-                    self._schedule_departure_samples = 0
-
-                if self._schedule_departure_samples >= SCHEDULE_DEPARTURE_CONFIRMATIONS:
-                    self._schedule_override = "mowing"
-                    self._schedule_override_started = time.monotonic()
-                    self._schedule_departure_samples = 0
-                    self._schedule_departure_evidence = True
-                    self._schedule_seen_below_dock_voltage = (
-                        status.voltage < CHARGING_VOLTAGE
-                    )
-                    return replace(
-                        status,
-                        inferred_activity="mowing",
-                        docked=False,
-                        charging=False,
-                        inference_source="schedule_resume_voltage",
-                    )
-                return status
-
-            self._schedule_departure_samples = 0
-            return replace(
-                status,
-                inferred_activity="mowing",
-                docked=False,
-                charging=False,
-                inference_source="schedule_clock_active",
-            )
-
-        # If Home Assistant happened to miss the exact minute event but saw the
-        # active schedule on the previous real poll, retain a sensible return
-        # state until measured docking takes over.
-        if was_active and not status.docked:
-            self._schedule_override = "returning"
-            self._schedule_override_started = time.monotonic()
-            return replace(
-                status,
-                inferred_activity="returning",
-                docked=False,
-                charging=False,
-                inference_source="schedule_elapsed",
-            )
-
-        if self._schedule_override == "mowing":
-            self._schedule_override = None
-        self._schedule_departure_samples = 0
-        self._schedule_departure_evidence = False
-        self._schedule_seen_below_dock_voltage = False
-        return status
+    @property
+    def current_mowing_minutes(self) -> float:
+        return self.state_machine.current_mowing_minutes(time.monotonic())
 
     async def async_sync_clock(self, force: bool = False) -> bool:
         """Sync on startup, local date change, or DST/time-zone change."""
@@ -386,3 +289,32 @@ class LyfcoCoordinator(DataUpdateCoordinator[MowerStatus]):
             return False
         self._clock_signature = signature
         return True
+
+    def diagnostics(self) -> dict[str, Any]:
+        """Return beta.5 coordinator diagnostics without network credentials."""
+        now_mono = time.monotonic()
+        return {
+            "connection_state": self._connection_state,
+            "last_real_status_age_seconds": (
+                None
+                if self._last_real_success <= 0
+                else round(max(0.0, now_mono - self._last_real_success), 1)
+            ),
+            "consecutive_update_failures": self._consecutive_update_failures,
+            "poll_mode": (
+                "fast" if now_mono < self._fast_poll_until else "normal"
+            ),
+            "current_poll_interval_seconds": (
+                FAST_POLL_SECONDS
+                if now_mono < self._fast_poll_until
+                else NORMAL_POLL_SECONDS
+            ),
+            "fast_poll_remaining_seconds": round(
+                max(0.0, self._fast_poll_until - now_mono), 1
+            ),
+            "fast_poll_reason": self._fast_poll_reason,
+            "learning_loaded": self._learning_loaded,
+            "schedule_was_active": self._schedule_was_active,
+            "command_revision_seen": self._command_revision_seen,
+            "last_action_age_seconds": self.client.last_action_age_seconds,
+        }
