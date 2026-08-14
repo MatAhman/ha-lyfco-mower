@@ -6,18 +6,15 @@ from datetime import datetime
 from typing import Any
 
 from .charge_learning import ChargeCycleLearning
-from .state_machine import (
-    Beta5StateMachine,
-    CHARGE_RECONNECT_REFERENCE,
-    VOLTAGE_EPSILON,
-)
+from .state_machine import CHARGE_RECONNECT_REFERENCE, VOLTAGE_EPSILON
+from .strict_state import StrictBeta5StateMachine
 
 SCHEDULE_START_GRACE_SECONDS = 120.0
 SCHEDULE_DEPARTURE_CONFIRMATIONS = 2
 SCHEDULE_DEPARTURE_STRONG_VOLTAGE = 26.4
 
 
-class Beta5FinalStateMachine(Beta5StateMachine):
+class Beta5FinalStateMachine(StrictBeta5StateMachine):
     """Add conservative physical departure proof at a scheduled start."""
 
     def __init__(self) -> None:
