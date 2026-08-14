@@ -15,9 +15,10 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
+from .beta5_client import Beta5MowerClient
 from .const import DEFAULT_NAME, DOMAIN, PLATFORMS
 from .coordinator import LyfcoCoordinator
-from .protocol import LyfcoError, LyfcoMowerClient
+from .protocol import LyfcoError
 
 SERVICE_SET_SCHEDULE = "set_schedule"
 
@@ -48,7 +49,7 @@ SET_SCHEDULE_SCHEMA = vol.Schema(
 class LyfcoRuntimeData:
     """Runtime objects associated with a config entry."""
 
-    client: LyfcoMowerClient
+    client: Beta5MowerClient
     coordinator: LyfcoCoordinator
 
 
@@ -89,14 +90,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: LyfcoConfigEntry) -> bool:
     """Set up Lyfco from a config entry."""
-    client = LyfcoMowerClient(entry.data[CONF_HOST])
+    client = Beta5MowerClient(entry.data[CONF_HOST])
     coordinator = LyfcoCoordinator(hass, entry, client)
+    await coordinator.async_load_persistent_state()
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = LyfcoRuntimeData(client, coordinator)
 
-    # Home Assistant 2026.8 restricts each device to one config entry. Create
-    # the mower explicitly for this entry before forwarding its entity
-    # platforms instead of relying only on implicit DeviceInfo processing.
     host = entry.data[CONF_HOST]
     device_registry = dr.async_get(hass)
     device_registry.async_get_or_create(
@@ -104,13 +103,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: LyfcoConfigEntry) -> boo
         identifiers={(DOMAIN, host)},
         name=DEFAULT_NAME,
         manufacturer="Lyfco",
-        model=coordinator.data.model
-        or "Robot mower (local LAN protocol)",
+        model=coordinator.data.model or "Robot mower (local LAN protocol)",
         sw_version=coordinator.data.firmware,
     )
 
-    # v0.5.1 replaced the optimistic blade switch with a stateless button.
-    # Remove the obsolete registry entry so it does not remain unavailable.
+    # Remove entities replaced by newer synchronized controls.
     registry = er.async_get(hass)
     for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
         obsolete_schedule_sensor = (
@@ -125,6 +122,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: LyfcoConfigEntry) -> boo
         )
         if obsolete_schedule_sensor or obsolete_blade_switch:
             registry.async_remove(entity.entity_id)
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     coordinator.async_start_schedule_tracker()
     return True
@@ -135,5 +133,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: LyfcoConfigEntry) -> bo
     if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False
     entry.runtime_data.coordinator.async_stop_schedule_tracker()
+    await entry.runtime_data.coordinator.async_shutdown()
     await entry.runtime_data.client.async_close()
     return True
