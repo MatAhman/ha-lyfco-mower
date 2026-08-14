@@ -46,12 +46,15 @@ class Beta5FinalStateMachine(Beta5StateMachine):
         suppress_schedule_start = False
 
         if schedule_started and self.docked:
+            previous_dock_voltage = (
+                self._samples[-1].voltage if self._samples else voltage
+            )
             self.schedule_departure_pending = True
             self.schedule_departure_started_mono = now_mono
             self.schedule_departure_samples = 0
-            self.schedule_departure_baseline_voltage = voltage
+            self.schedule_departure_baseline_voltage = previous_dock_voltage
             self.schedule_departure_evidence = False
-            self._schedule_departure_previous_voltage = voltage
+            self._schedule_departure_previous_voltage = previous_dock_voltage
             # Keep Docked until voltage behavior shows the mower really left.
             suppress_schedule_start = True
 
@@ -92,8 +95,8 @@ class Beta5FinalStateMachine(Beta5StateMachine):
                 self.return_context_reason = None
                 self.return_started_mono = None
                 self._explicit_hold = False
-                # Discard pre-departure charging samples so residual charging
-                # history cannot immediately re-dock the mower.
+                # Discard pre-departure charge-trend samples so residual
+                # charging history cannot immediately re-dock the mower.
                 self._samples.clear()
                 changed |= self._set_state(
                     "mowing",
@@ -114,7 +117,8 @@ class Beta5FinalStateMachine(Beta5StateMachine):
                     >= SCHEDULE_START_GRACE_SECONDS
                 )
             ):
-                # No physical departure within the grace window: retain dock.
+                # No physical departure within the grace window: the mower
+                # refused/delayed the run, so retain the measured dock state.
                 self.schedule_departure_pending = False
                 self.schedule_departure_samples = 0
                 self._schedule_departure_previous_voltage = None
