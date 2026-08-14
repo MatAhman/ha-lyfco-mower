@@ -1,12 +1,14 @@
 {
   "domain": "lyfco_mower",
   "name": "Lyfco Robot Mower",
-  "codeowners": ["@MatAhman"],
+  "codeowners": [
+    "@MatAhman"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/MatAhman/ha-lyfco-mower",
   "issue_tracker": "https://github.com/MatAhman/ha-lyfco-mower/issues",
   "integration_type": "device",
   "iot_class": "local_polling",
   "requirements": [],
-  "version": "0.7.7"
+  "version": "1.0.0"
 }

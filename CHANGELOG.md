@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.0.0
+
+- Promote the field-tested `0.7.8-beta.5` code to the first stable release.
+- No mower-control or state-machine behavior was changed between beta.5 and 1.0.0;
+  only release/version metadata and diagnostics labeling were updated.
+- Replace schedule-dominant activity inference with a single final state machine
+  shared by the mower, Docked and Charging entities.
+- Never accept 26.4 V or any other absolute voltage alone as proof of docking.
+  Sustained charging evidence is required, preventing the observed
+  `26.38 -> 26.40 -> 26.31 V` false dock while mowing.
+- Add passive dock/charging detection during an active schedule and after an
+  integration reload. A large dock-contact jump followed by a rise, or a longer
+  monotonic charging rise, can override a stale `Mowing` assumption.
+- Keep a confirmed dock/charging state through schedule end instead of creating
+  a fictitious `Returning` phase when the mower is already home.
+- Treat low-battery alarm evidence as a real return context and retain explicit
+  Home Assistant movement commands above schedule expectations.
+- Add contradiction diagnostics, transition history, 2000 voltage samples, and
+  latest/previous mowing-session history.
+- Keep 30 s normal polling and use 10 s polling for three minutes around verified
+  commands, state transitions and schedule boundaries.
+- Persist completed charging phases and mowing-session history across integration
+  reloads without persisting the live activity latch itself.
+- Add an estimated battery percentage sensor using 24.0 V = 5% and 29.0 V = 100%
+  with linear interpolation and clamping.
+- Add minute-resolution current charging-time sensor; the mower's own cumulative
+  charging counter remains available in whole hours.
+- Verify schedule writes with up to three read-back attempts and include requested
+  and returned values in diagnostics.
+
 ## 0.7.7 (experimental)
 
 - Fix an explicit `Return to charger` (`Y7`) getting stuck as `Returning` with

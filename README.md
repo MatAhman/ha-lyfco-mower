@@ -29,43 +29,58 @@ including models sold under the Exgain, Lawnba, Ezirobot, and Devvis brands.
 These additional brands have not yet been tested with this integration, so
 compatibility is not guaranteed. Reports and protocol observations are welcome.
 
-The included integration icon is shown locally by Home Assistant 2026.3 and
-newer. The icon is also included as a HACS brand asset.
-
 ## Features
 
 - Standard Home Assistant `lawn_mower` entity.
 - Start automatic mowing, stop/pause, and return to charger.
 - Manual mode with forward, reverse, left, and right controls.
 - Stateless cutting blade toggle button.
-- Machine voltage, total mowing time, total charging time, and firmware sensors.
+- Machine voltage, total mowing time, total charging time, firmware, estimated
+  battery percentage, and minute-resolution current charging-time sensors.
 - Eleven identified diagnostic alarm sensors plus three explicitly unknown
   alarm flags reserved for future protocol analysis.
-- Inferred mowing, returning, docked, and active-charging status based on the
-  last verified command and measured voltage.
+- Inferred mowing, returning, docked, and active-charging status from one final
+  state machine shared by the mower, Docked, and Charging entities.
+- Passive charger detection from sustained voltage behavior, including recovery
+  after an integration reload while a schedule is still active.
 - Inferred rain detection when an automatic run returns to charge without a
   home command, low-battery indication, or another alarm.
 - Read-only working-area configuration and seven editable weekday schedule rows.
 - Seven directly editable weekday rows displayed as `start - end` ranges.
-- Schedule editing through the `lyfco_mower.set_schedule` action with read-back verification.
+- Schedule editing through the `lyfco_mower.set_schedule` action with up to
+  three read-back verification attempts.
 - Automatic mower-clock synchronization, including daylight-saving changes.
 - Model and firmware discovery from the LAN handshake.
 - One synchronized edge-mowing switch for each weekday.
 - Synchronized switch for enabling or disabling the mower rain sensor.
-- Local polling every 30 seconds with a persistent TCP connection and heartbeat.
+- Normal polling every 30 seconds with 10-second fast polling for three minutes
+  around verified commands, state transitions, and schedule boundaries.
+- Diagnostic transition history, voltage history, and latest/previous mowing
+  sessions to support protocol testing.
 - Standalone tool for connecting a factory/AP-mode mower to a 2.4 GHz Wi-Fi network.
 - English default strings and Swedish translations.
 
 ## Important limitations
 
-- The mower status response does not directly report mowing, dock, rain, or
-  blade state. Activity combines the most recent verified command with measured
-  voltage. Active charging is detected at 26.4 V and above on the tested E1750;
-  dock state is then remembered until a new movement command is sent.
+- The mower status response does not directly report mowing, dock, rain, blade,
+  or battery state of charge. Beta.5 therefore treats absolute voltage values as
+  supporting context only. A single value such as 26.4 V cannot establish dock
+  state; docking requires a confirmed return context or a sustained charging
+  signature.
+- The estimated battery percentage is derived from the tested E1750 voltage
+  behavior. It currently maps 24.0 V to 5% and 29.0 V or higher to 100%, using
+  linear interpolation in between. It is not a battery-management-system SoC.
+- The mower's cumulative charging counter is reported only in whole hours. The
+  separate current charging-time sensor measures the currently inferred charging
+  phase in minutes from Home Assistant observations.
 - `Rain detected (inferred)` is not a physical wet-contact reading. It indicates
   that a mower started through this integration returned to charging without a
   home/stop command, low-battery indication, or another alarm. Schedule
   completion or a physical-panel command can therefore cause an incorrect result.
+- A mower can return to charge by itself during an active schedule. Beta.5 can
+  recognize the resulting dock/charge state passively. Automatic resume after a
+  mid-schedule charge is not forced by Home Assistant; physical resume behavior
+  remains intentionally observational until it is verified on the mower.
 - The blade uses a toggle-only command (`Y8`) and the mower reports no blade
   state. It is therefore exposed as a stateless button rather than a switch.
 - The Android app contains no command for acknowledging or clearing alarms.
@@ -162,6 +177,10 @@ If a day uses several working areas, changing only the start time preserves all
 area durations. Changing the total duration is blocked because a single time
 range cannot describe how the new duration should be divided. For that advanced
 case, use **Developer tools → Actions → Lyfco Robot Mower: Set weekday schedule**.
+
+A schedule is written once and then read back up to three times. A temporary
+stale read-back therefore does not fail the edit immediately, while a persistent
+mismatch is still reported as an error and included in diagnostics.
 
 Each weekday also has an **Edge mowing** switch on the device page. These are
 real synchronized switches: the current value comes from the mower schedule,
