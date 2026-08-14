@@ -315,4 +315,9 @@ class LyfcoCoordinator(DataUpdateCoordinator[MowerStatus]):
             "schedule_was_active": self._schedule_was_active,
             "command_revision_seen": self._command_revision_seen,
             "last_action_age_seconds": self.client.last_action_age_seconds,
+            "last_client_status_age_seconds": self.client.last_status_age_seconds,
+            "freshness_guard_before_user_commands_seconds": (
+                self.client.USER_COMMAND_FRESHNESS_SECONDS
+            ),
+            "learning_revision_saved": self.state_machine.charge_learning.revision,
         }
