@@ -11,13 +11,34 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import EntityCategory, UnitOfElectricPotential, UnitOfTime
+from homeassistant.const import (
+    EntityCategory,
+    PERCENTAGE,
+    UnitOfElectricPotential,
+    UnitOfTime,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import LyfcoConfigEntry
 from .entity import LyfcoEntity
 from .protocol import MowerStatus
+
+BATTERY_EMPTY_VOLTAGE = 24.0
+BATTERY_FULL_VOLTAGE = 29.0
+BATTERY_MIN_PERCENT = 5
+
+
+def estimated_battery_percent(voltage: float) -> int:
+    """Estimate state of charge from the measured E1750 voltage."""
+    if voltage <= BATTERY_EMPTY_VOLTAGE:
+        return BATTERY_MIN_PERCENT
+    if voltage >= BATTERY_FULL_VOLTAGE:
+        return 100
+    ratio = (voltage - BATTERY_EMPTY_VOLTAGE) / (
+        BATTERY_FULL_VOLTAGE - BATTERY_EMPTY_VOLTAGE
+    )
+    return round(BATTERY_MIN_PERCENT + ratio * (100 - BATTERY_MIN_PERCENT))
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -54,6 +75,15 @@ SENSORS = (
         value_fn=lambda status: status.voltage,
     ),
     LyfcoSensorDescription(
+        key="battery_estimated",
+        translation_key="battery_estimated",
+        device_class=SensorDeviceClass.BATTERY,
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:battery",
+        value_fn=lambda status: estimated_battery_percent(status.voltage),
+    ),
+    LyfcoSensorDescription(
         key="active_alarms",
         translation_key="active_alarms",
         icon="mdi:alert-circle-outline",
@@ -84,11 +114,15 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Create mower sensors."""
-    async_add_entities(LyfcoSensor(entry, description) for description in SENSORS)
+    entities: list[SensorEntity] = [
+        LyfcoSensor(entry, description) for description in SENSORS
+    ]
+    entities.append(LyfcoCurrentChargingMinutesSensor(entry))
+    async_add_entities(entities)
 
 
 class LyfcoSensor(LyfcoEntity, SensorEntity):
-    """A value read from the W/V responses."""
+    """A value read from the W/V responses or derived from voltage."""
 
     entity_description: LyfcoSensorDescription
 
@@ -114,4 +148,40 @@ class LyfcoSensor(LyfcoEntity, SensorEntity):
                 }
                 for area in self.coordinator.data.areas
             }
+        if self.entity_description.key == "battery_estimated":
+            return {
+                "estimated": True,
+                "model": "linear_voltage_estimate",
+                "empty_reference_voltage": BATTERY_EMPTY_VOLTAGE,
+                "empty_reference_percent": BATTERY_MIN_PERCENT,
+                "full_reference_voltage": BATTERY_FULL_VOLTAGE,
+                "machine_voltage": self.coordinator.data.voltage,
+            }
         return None
+
+
+class LyfcoCurrentChargingMinutesSensor(LyfcoEntity, SensorEntity):
+    """Minute-resolution duration of the currently detected charging phase."""
+
+    _attr_translation_key = "current_charging_minutes"
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:timer-charging"
+
+    def __init__(self, entry: LyfcoConfigEntry) -> None:
+        super().__init__(entry, "current_charging_minutes")
+
+    @property
+    def native_value(self) -> float:
+        return self.coordinator.current_charging_minutes
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        return {
+            "active_charging": self.coordinator.data.charging,
+            "note": (
+                "Minute-resolution time for the currently inferred charging "
+                "phase; the mower's own total charging counter is only whole hours."
+            ),
+        }
