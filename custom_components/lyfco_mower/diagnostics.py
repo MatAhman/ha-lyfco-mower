@@ -1,4 +1,4 @@
-"""Diagnostics support for Lyfco Robot Mower beta.5."""
+"""Diagnostics support for Lyfco Robot Mower 1.0.0."""
 
 from __future__ import annotations
 
@@ -35,12 +35,12 @@ async def async_get_config_entry_diagnostics(
     return {
         "integration": {
             "config_entry_id": entry.entry_id,
-            "local_test_version": "0.7.8-beta.5",
+            "integration_version": "1.0.0",
             "diagnostics_format": 5,
         },
         "experiment": {
             "purpose": (
-                "validate passive dock detection, schedule authority fixes, "
+                "field-tested passive dock detection, schedule authority fixes, "
                 "reload recovery and estimated battery state"
             ),
             "normal_w_poll_seconds": 30,
