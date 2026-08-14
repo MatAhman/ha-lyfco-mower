@@ -33,15 +33,7 @@ final_spec.loader.exec_module(final_module)
 Machine = final_module.Beta5FinalStateMachine
 
 
-def _update(
-    machine,
-    voltage,
-    seconds,
-    *,
-    active=True,
-    started=False,
-    ended=False,
-):
+def _update(machine, voltage, seconds, *, active=True, started=False, ended=False):
     base = datetime(2026, 8, 14, 9, 0, tzinfo=timezone.utc)
     machine.update(
         voltage=voltage,
@@ -100,14 +92,17 @@ def test_schedule_end_while_already_charging_does_not_create_returning():
 def test_scheduled_start_from_dock_waits_for_departure_evidence():
     machine = Machine()
 
+    # Establish a real dock from a charging rise.
     for index, voltage in enumerate([26.90, 26.94, 26.98, 27.02, 27.06, 27.10]):
         _update(machine, voltage, index * 30, active=False)
     assert machine.docked is True
 
+    # The clock alone must not clear a confirmed dock.
     _update(machine, 27.10, 180, active=True, started=True)
     assert machine.docked is True
     assert machine.schedule_departure_pending is True
 
+    # Two falling samples at/below the reconnect reference establish departure.
     _update(machine, 27.00, 210, active=True)
     _update(machine, 26.82, 240, active=True)
 
@@ -122,44 +117,24 @@ def test_charge_learning_cycle_persists_and_summarizes():
     base = datetime(2026, 8, 14, 12, 0, tzinfo=timezone.utc)
 
     learning.observe(
-        docked=True,
-        charging=True,
-        voltage=28.8,
-        now_mono=0.0,
-        now_utc=base,
-        reason="confirmed_return_charge_rise_after_settle",
+        docked=True, charging=True, voltage=28.8,
+        now_mono=0.0, now_utc=base, reason="confirmed_return_charge_rise_after_settle"
     )
     learning.observe(
-        docked=True,
-        charging=True,
-        voltage=30.15,
-        now_mono=600.0,
-        now_utc=base + timedelta(seconds=600),
-        reason="charge_cycle_charging",
+        docked=True, charging=True, voltage=30.15,
+        now_mono=600.0, now_utc=base + timedelta(seconds=600), reason="charge_cycle_charging"
     )
     learning.observe(
-        docked=True,
-        charging=False,
-        voltage=29.0,
-        now_mono=900.0,
-        now_utc=base + timedelta(seconds=900),
-        reason="charge_cycle_backoff",
+        docked=True, charging=False, voltage=29.0,
+        now_mono=900.0, now_utc=base + timedelta(seconds=900), reason="charge_cycle_backoff"
     )
     learning.observe(
-        docked=True,
-        charging=False,
-        voltage=28.73,
-        now_mono=1080.0,
-        now_utc=base + timedelta(seconds=1080),
-        reason="charge_cycle_backoff",
+        docked=True, charging=False, voltage=28.73,
+        now_mono=1080.0, now_utc=base + timedelta(seconds=1080), reason="charge_cycle_backoff"
     )
     learning.observe(
-        docked=True,
-        charging=True,
-        voltage=29.1,
-        now_mono=1200.0,
-        now_utc=base + timedelta(seconds=1200),
-        reason="charge_cycle_charging",
+        docked=True, charging=True, voltage=29.1,
+        now_mono=1200.0, now_utc=base + timedelta(seconds=1200), reason="charge_cycle_charging"
     )
 
     assert len(learning.completed_cycles) == 1
@@ -174,3 +149,33 @@ def test_charge_learning_cycle_persists_and_summarizes():
     restored.load_persistent(learning.export_persistent())
     assert len(restored.completed_cycles) == 1
     assert restored.learning_summary()["peak_voltage"]["max"] == 30.15
+
+
+def test_small_post_backoff_bounce_does_not_fake_reconnect():
+    machine = Machine()
+
+    # Real dock contact and charging rise.
+    for index, voltage in enumerate([23.92, 24.64, 24.81, 24.89]):
+        _update(machine, voltage, index * 30, active=False)
+    assert machine.charging is True
+
+    # Continue charging, then confirm a real falling backoff trend.
+    start = 120
+    for index, voltage in enumerate([29.30, 29.26, 29.22, 29.18]):
+        _update(machine, voltage, start + index * 30, active=False)
+    assert machine.docked is True
+    assert machine.charging is False
+    assert machine.source == "confirmed_backoff_fall"
+
+    # Small bounce/noise must stay in backoff.
+    start = 240
+    for index, voltage in enumerate([29.19, 29.18, 29.20, 29.19]):
+        _update(machine, voltage, start + index * 30, active=False)
+    assert machine.charging is False
+
+    # A sustained reconnect rise is accepted.
+    start = 360
+    for index, voltage in enumerate([28.73, 28.77, 28.82, 28.88]):
+        _update(machine, voltage, start + index * 30, active=False)
+    assert machine.charging is True
+    assert machine.source == "confirmed_reconnect_rise"
