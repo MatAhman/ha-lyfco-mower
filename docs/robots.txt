@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://matahman.github.io/ha-lyfco-mower/sitemap.xml
