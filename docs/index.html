@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lyfco E1750 Home Assistant Integration | EGRobot & Miotlink</title>
+  <meta name="description" content="Local Home Assistant integration for Lyfco E1750 and compatible EGRobot/Miotlink robot lawn mowers. Local control, scheduling, diagnostics and Wi-Fi provisioning without cloud access.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://matahman.github.io/ha-lyfco-mower/">
+  <link rel="alternate" hreflang="en" href="https://matahman.github.io/ha-lyfco-mower/">
+  <link rel="alternate" hreflang="sv" href="https://matahman.github.io/ha-lyfco-mower/sv/">
+  <link rel="alternate" hreflang="x-default" href="https://matahman.github.io/ha-lyfco-mower/">
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="icon" href="assets/icon.png" type="image/png">
+</head>
+<body>
+  <main class="container">
+    <div class="lang"><a href="sv/" hreflang="sv">Svenska</a></div>
+
+    <header class="hero">
+      <img class="logo" src="assets/icon.png" alt="Lyfco robot mower icon" width="120" height="120">
+      <h1>Lyfco E1750 Robot Mower for Home Assistant</h1>
+      <p class="lead">A local Home Assistant integration for the Lyfco E1750 and potentially compatible robot lawn mowers using the EGRobot/Miotlink platform. Control stays on your local network, with no cloud account or original Android app required after Wi-Fi provisioning.</p>
+      <div class="actions">
+        <a class="button primary" href="https://github.com/MatAhman/ha-lyfco-mower">View on GitHub</a>
+        <a class="button" href="#installation">Installation</a>
+        <a class="button" href="PROTOCOL.md">Protocol notes</a>
+      </div>
+    </header>
+
+    <section>
+      <h2>Compatibility</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Tested</h3>
+          <p><strong>Lyfco E1750</strong></p>
+          <ul>
+            <li>Protocol/model identifier: <code>M10</code></li>
+            <li>Firmware/device identifier: <code>M10_1.5.4</code></li>
+            <li>Local TCP control on port <code>9600</code></li>
+            <li>Miotlink AP provisioning at <code>192.168.4.1</code></li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Potentially compatible</h3>
+          <p>Other mowers using the <strong>EGRobot</strong> app and Miotlink platform may use a similar protocol, including models sold under:</p>
+          <ul>
+            <li>Exgain</li>
+            <li>Lawnba</li>
+            <li>Ezirobot</li>
+            <li>Devvis</li>
+          </ul>
+          <p>These brands have not yet been verified with this integration.</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Features</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Local mower control</h3>
+          <ul>
+            <li>Standard Home Assistant <code>lawn_mower</code> entity</li>
+            <li>Start mowing, stop/pause and return to charger</li>
+            <li>Manual forward, reverse, left and right control</li>
+            <li>Stateless cutting blade toggle button</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Monitoring</h3>
+          <ul>
+            <li>Machine voltage and estimated battery percentage</li>
+            <li>Total mowing and charging time</li>
+            <li>Minute-resolution current charging-time sensor</li>
+            <li>Diagnostic alarm and transition history</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Schedules & automation</h3>
+          <ul>
+            <li>Seven editable weekday schedules</li>
+            <li>Per-day edge-mowing switches</li>
+            <li>Mower clock synchronization including DST changes</li>
+            <li>Rain-sensor enable/disable control</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Wi-Fi provisioning</h3>
+          <p>A standalone provisioning tool can connect a factory/AP-mode mower to a 2.4 GHz Wi-Fi network. After provisioning, Home Assistant communicates directly with the mower over the LAN.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="installation">
+      <h2>Installation</h2>
+      <h3>HACS custom repository</h3>
+      <ol>
+        <li>Open HACS in Home Assistant.</li>
+        <li>Open the menu and choose <strong>Custom repositories</strong>.</li>
+        <li>Add <code>https://github.com/MatAhman/ha-lyfco-mower</code> as an <strong>Integration</strong>.</li>
+        <li>Install <strong>Lyfco Robot Mower</strong> and restart Home Assistant.</li>
+        <li>Go to <strong>Settings → Devices & services → Add integration</strong> and search for <strong>Lyfco Robot Mower</strong>.</li>
+      </ol>
+
+      <h3>Manual installation</h3>
+      <p>Copy <code>custom_components/lyfco_mower</code> to your Home Assistant configuration directory so the manifest is located at:</p>
+      <pre><code>/config/custom_components/lyfco_mower/manifest.json</code></pre>
+      <p>Restart Home Assistant and add the integration from <strong>Settings → Devices & services</strong>.</p>
+    </section>
+
+    <section>
+      <h2>Local-first design</h2>
+      <p>The integration is designed for direct LAN communication with the mower. No vendor cloud account is required for normal operation after the mower has been provisioned onto your Wi-Fi network.</p>
+      <p class="notice"><strong>Independent project:</strong> This is an independent reverse-engineering project and is not affiliated with Lyfco, Miotlink, EGRobot or Home Assistant. Robot lawn mowers and cutting blades can cause injury; test controls outdoors and keep the physical stop control within reach.</p>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">Lyfco Robot Mower for Home Assistant · <a href="https://github.com/MatAhman/ha-lyfco-mower">GitHub repository</a></div>
+  </footer>
+</body>
+</html>
