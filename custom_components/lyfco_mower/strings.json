@@ -62,6 +62,7 @@
       "edge_mowing_saturday": {"name": "Edge mowing Saturday"}
     },
     "binary_sensor": {
+      "online": {"name": "Online"},
       "docked": {"name": "Docked"},
       "charging": {"name": "Charging"},
       "rain_detected_inferred": {"name": "Rain detected (inferred)"},
