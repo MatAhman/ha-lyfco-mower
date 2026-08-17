@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lyfco E1750 Home Assistant – integration för robotgräsklippare</title>
+  <meta name="description" content="Lokal Home Assistant-integration för Lyfco E1750 och kompatibla EGRobot/Miotlink-robotgräsklippare. Lokal styrning utan molntjänst eller originalapp.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://matahman.github.io/ha-lyfco-mower/sv/">
+  <link rel="alternate" hreflang="en" href="https://matahman.github.io/ha-lyfco-mower/">
+  <link rel="alternate" hreflang="sv" href="https://matahman.github.io/ha-lyfco-mower/sv/">
+  <link rel="alternate" hreflang="x-default" href="https://matahman.github.io/ha-lyfco-mower/">
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="icon" href="../assets/icon.png" type="image/png">
+</head>
+<body>
+  <main class="container">
+    <div class="lang"><a href="../" hreflang="en">English</a></div>
+
+    <header class="hero">
+      <img class="logo" src="../assets/icon.png" alt="Ikon för Lyfco robotgräsklippare" width="120" height="120">
+      <h1>Lyfco E1750 robotgräsklippare i Home Assistant</h1>
+      <p class="lead">En lokal Home Assistant-integration för Lyfco E1750 och potentiellt kompatibla robotgräsklippare som använder EGRobot/Miotlink-plattformen. Styrningen sker på ditt lokala nätverk och efter Wi-Fi-konfiguration behövs varken molnkonto eller originalappen för normal drift.</p>
+      <div class="actions">
+        <a class="button primary" href="https://github.com/MatAhman/ha-lyfco-mower">Visa på GitHub</a>
+        <a class="button" href="#installation">Installation</a>
+        <a class="button" href="../PROTOCOL.md">Protokollanteckningar</a>
+      </div>
+    </header>
+
+    <section>
+      <h2>Kompatibilitet</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Testad</h3>
+          <p><strong>Lyfco E1750</strong></p>
+          <ul>
+            <li>Protokoll-/modellidentifierare: <code>M10</code></li>
+            <li>Firmware-/enhetsidentifierare: <code>M10_1.5.4</code></li>
+            <li>Lokal TCP-styrning på port <code>9600</code></li>
+            <li>Miotlink AP-konfiguration på <code>192.168.4.1</code></li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Potentiellt kompatibla</h3>
+          <p>Andra klippare som använder <strong>EGRobot</strong>-appen och Miotlink-plattformen kan använda ett liknande protokoll, bland annat modeller som säljs under:</p>
+          <ul>
+            <li>Exgain</li>
+            <li>Lawnba</li>
+            <li>Ezirobot</li>
+            <li>Devvis</li>
+          </ul>
+          <p>Dessa märken är ännu inte verifierade med integrationen.</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Funktioner</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Lokal styrning</h3>
+          <ul>
+            <li>Standardentitet av typen <code>lawn_mower</code> i Home Assistant</li>
+            <li>Starta klippning, stoppa/pausa och kör hem till laddaren</li>
+            <li>Manuell körning framåt, bakåt, vänster och höger</li>
+            <li>Knapp för att växla klippkniven</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Övervakning</h3>
+          <ul>
+            <li>Maskinspänning och uppskattad batteriprocent</li>
+            <li>Total klipptid och laddtid</li>
+            <li>Aktuell laddtid med minutupplösning</li>
+            <li>Diagnostiklarm och historik över tillståndsövergångar</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Schema och automation</h3>
+          <ul>
+            <li>Sju redigerbara veckodagsscheman</li>
+            <li>Kantskärningsbrytare per veckodag</li>
+            <li>Synkronisering av klipparens klocka inklusive sommartid</li>
+            <li>Styrning av klipparens regnsensor</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Wi-Fi-konfiguration</h3>
+          <p>Ett fristående verktyg kan ansluta en klippare i fabriks-/AP-läge till ett 2,4 GHz Wi-Fi-nät. Därefter kommunicerar Home Assistant direkt med klipparen över det lokala nätverket.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="installation">
+      <h2>Installation</h2>
+      <h3>HACS som anpassat repository</h3>
+      <ol>
+        <li>Öppna HACS i Home Assistant.</li>
+        <li>Öppna menyn och välj <strong>Custom repositories</strong>.</li>
+        <li>Lägg till <code>https://github.com/MatAhman/ha-lyfco-mower</code> som typen <strong>Integration</strong>.</li>
+        <li>Installera <strong>Lyfco Robot Mower</strong> och starta om Home Assistant.</li>
+        <li>Gå till <strong>Inställningar → Enheter och tjänster → Lägg till integration</strong> och sök efter <strong>Lyfco Robot Mower</strong>.</li>
+      </ol>
+
+      <h3>Manuell installation</h3>
+      <p>Kopiera <code>custom_components/lyfco_mower</code> till Home Assistants konfigurationskatalog så att manifestet hamnar här:</p>
+      <pre><code>/config/custom_components/lyfco_mower/manifest.json</code></pre>
+      <p>Starta om Home Assistant och lägg sedan till integrationen från <strong>Inställningar → Enheter och tjänster</strong>.</p>
+    </section>
+
+    <section>
+      <h2>Lokal drift utan molntjänst</h2>
+      <p>Integrationen är byggd för direkt kommunikation med robotgräsklipparen på LAN. För normal drift behövs inget leverantörskonto i molnet efter att klipparen har anslutits till ditt Wi-Fi.</p>
+      <p class="notice"><strong>Oberoende projekt:</strong> Detta är ett fristående reverse-engineering-projekt och är inte anslutet till Lyfco, Miotlink, EGRobot eller Home Assistant. Robotgräsklippare och klippknivar kan orsaka personskador; prova styrningen utomhus och håll klipparens fysiska stoppknapp inom räckhåll.</p>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">Lyfco Robot Mower för Home Assistant · <a href="https://github.com/MatAhman/ha-lyfco-mower">GitHub-repository</a></div>
+  </footer>
+</body>
+</html>
