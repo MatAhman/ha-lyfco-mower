@@ -62,6 +62,7 @@
       "edge_mowing_saturday": {"name": "Kantklippning lördag"}
     },
     "binary_sensor": {
+      "online": {"name": "Online"},
       "docked": {"name": "Dockad"},
       "charging": {"name": "Laddar"},
       "rain_detected_inferred": {"name": "Regn upptäckt (härledd)"},
