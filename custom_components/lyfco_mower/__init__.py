@@ -22,6 +22,8 @@ from .protocol import LyfcoError
 
 SERVICE_SET_SCHEDULE = "set_schedule"
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 
 def _area_minutes(value: object) -> int:
     """Validate the original app's 0-250 minute, 10-minute-step range."""
