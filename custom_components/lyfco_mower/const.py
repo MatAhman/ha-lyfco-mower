@@ -56,3 +56,9 @@ CHARGING_VOLTAGE = 26.4
 CHARGE_BACKOFF_VOLTAGE = 29.5
 CHARGE_RECONNECT_VOLTAGE = 28.6
 VOLTAGE_TREND_EPSILON = 0.02
+
+# Connectivity sensor debounce. A normal poll is every 30 seconds, so three
+# consecutive failures are normally about 90 seconds. The age limit also keeps
+# the sensor honest if polling is delayed or suspended for any reason.
+ONLINE_MAX_FAILURES = 3
+ONLINE_MAX_AGE_SECONDS = 90.0
