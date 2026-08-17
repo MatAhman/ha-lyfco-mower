@@ -1,6 +1,9 @@
-"""Alarm binary sensors for Lyfco mower."""
+"""Binary sensors for Lyfco mower."""
 
 from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+import time
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -17,6 +20,8 @@ from .const import (
     CHARGE_BACKOFF_VOLTAGE,
     CHARGE_RECONNECT_VOLTAGE,
     CHARGING_VOLTAGE,
+    ONLINE_MAX_AGE_SECONDS,
+    ONLINE_MAX_FAILURES,
 )
 from .entity import LyfcoEntity
 
@@ -26,9 +31,10 @@ async def async_setup_entry(
     entry: LyfcoConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Create inferred state and the 14 decoded alarm entities."""
+    """Create connectivity, inferred state and decoded alarm entities."""
     async_add_entities(
         [
+            LyfcoOnlineBinarySensor(entry),
             LyfcoDockedBinarySensor(entry),
             LyfcoChargingBinarySensor(entry),
             LyfcoInferredRainBinarySensor(entry),
@@ -40,6 +46,64 @@ async def async_setup_entry(
             ),
         ]
     )
+
+
+class LyfcoOnlineBinarySensor(LyfcoEntity, BinarySensorEntity):
+    """Expose whether the mower is responding to status polling."""
+
+    _attr_translation_key = "online"
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, entry: LyfcoConfigEntry) -> None:
+        super().__init__(entry, "online")
+
+    @property
+    def available(self) -> bool:
+        """Keep the connectivity entity available when the mower is offline."""
+        return True
+
+    @property
+    def is_on(self) -> bool:
+        """Return true while recent communication remains trustworthy."""
+        last_success = self.coordinator._last_real_success
+        if last_success <= 0:
+            return False
+        age = max(0.0, time.monotonic() - last_success)
+        return (
+            self.coordinator._consecutive_update_failures < ONLINE_MAX_FAILURES
+            and age <= ONLINE_MAX_AGE_SECONDS
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        """Expose useful connection diagnostics."""
+        last_success = self.coordinator._last_real_success
+        age = (
+            None
+            if last_success <= 0
+            else round(max(0.0, time.monotonic() - last_success), 1)
+        )
+        last_successful_poll = (
+            None
+            if age is None
+            else (
+                datetime.now(timezone.utc) - timedelta(seconds=age)
+            ).isoformat()
+        )
+        poll_interval = self.coordinator.update_interval
+        return {
+            "last_seen": last_successful_poll,
+            "last_successful_poll": last_successful_poll,
+            "last_seen_age_seconds": age,
+            "consecutive_failures": self.coordinator._consecutive_update_failures,
+            "poll_interval_seconds": (
+                None if poll_interval is None else poll_interval.total_seconds()
+            ),
+            "connection_state": self.coordinator._connection_state,
+            "offline_after_failures": ONLINE_MAX_FAILURES,
+            "offline_after_seconds": ONLINE_MAX_AGE_SECONDS,
+        }
 
 
 class LyfcoDockedBinarySensor(LyfcoEntity, BinarySensorEntity):
