@@ -1,6 +1,6 @@
 {
   "domain": "lyfco_mower",
-  "name": "Lyfco Robot Mower",
+  "name": "EGROBOT Mower",
   "codeowners": [
     "@MatAhman"
   ],
@@ -10,5 +10,5 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/MatAhman/ha-lyfco-mower/issues",
   "requirements": [],
-  "version": "1.0.1"
+  "version": "1.1.0-beta.1"
 }
