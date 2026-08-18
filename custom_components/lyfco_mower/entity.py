@@ -1,4 +1,4 @@
-"""Base entity for Lyfco mower."""
+"""Base entity for EGROBOT-compatible robot mowers."""
 
 from __future__ import annotations
 
@@ -22,8 +22,7 @@ class LyfcoEntity(CoordinatorEntity[LyfcoCoordinator]):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, host)},
             name=DEFAULT_NAME,
-            manufacturer="Lyfco",
             model=self.coordinator.data.model
-            or "Robotgräsklippare (lokalt LAN-protokoll)",
+            or "Robot mower (local EGROBOT/Miotlink protocol)",
             sw_version=self.coordinator.data.firmware,
         )
