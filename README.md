@@ -1,22 +1,26 @@
-# Lyfco Robot Mower for Home Assistant
+# EGROBOT Mower for Home Assistant
 
 <p align="center">
   <img src="custom_components/lyfco_mower/brand/icon.png" width="128" alt="Black robot lawn mower icon">
 </p>
 
-Local Home Assistant integration and Wi-Fi provisioning tool for selected
-Lyfco/Miotlink robot mowers. Communication stays on the local network; no cloud
-account or original Android app is required after provisioning.
+Local Home Assistant integration and Wi-Fi provisioning tool for robot mowers
+using the **EGROBOT / Miotlink** local protocol. Communication stays on the
+local network; no cloud account or original Android app is required after
+provisioning.
+
+The integration keeps the historical Home Assistant domain `lyfco_mower` and
+repository name `ha-lyfco-mower` for backwards compatibility.
 
 > [!WARNING]
 > This is an independent reverse-engineering project and is not affiliated with
-> Lyfco, Miotlink, or Home Assistant. Mowers and cutting blades can cause injury.
-> Test controls outdoors, keep the mower in sight, and keep the physical stop
-> control within reach.
+> any mower brand, EGROBOT, Miotlink, Zhejiang Tianchen, or Home Assistant.
+> Mowers and cutting blades can cause injury. Test controls outdoors, keep the
+> mower in sight, and keep the physical stop control within reach.
 
 ## Compatibility
 
-The integration has been tested on a **Lyfco E1750** with:
+The integration has been physically tested on a **Lyfco E1750** with:
 
 - mower protocol/model identifier `M10`;
 - firmware/device identifier `M10_1.5.4`;
@@ -24,10 +28,30 @@ The integration has been tested on a **Lyfco E1750** with:
 - local TCP control on port 9600;
 - Miotlink AP provisioning at `192.168.4.1`.
 
-It may also work with other robot mowers that use the **EGRobot** app,
-including models sold under the Exgain, Lawnba, Ezirobot, and Devvis brands.
-These additional brands have not yet been tested with this integration, so
-compatibility is not guaranteed. Reports and protocol observations are welcome.
+The following brands/models are known to use the EGROBOT app or the same
+EGROBOT/Tianchen family and are therefore **expected to be compatible**, but
+have not been physically tested with this integration unless stated otherwise:
+
+- Lyfco
+- Exgain
+- Lawnba
+- Ezirobot
+- Devvis
+- RobotZoo Wombat
+- Maxton
+- GEM
+- Seon
+- VERTAK
+- FUXTEC
+- NAC
+- Land Shark
+- ROOKS
+- AutoLawnMow / Genie
+- E.ZICOM / e.zigreen
+
+Using the same EGROBOT app is a strong compatibility indicator, but different
+firmware generations may expose slightly different status fields or optional
+features. Reports and diagnostics from additional models are welcome.
 
 ## Features
 
@@ -37,8 +61,10 @@ compatibility is not guaranteed. Reports and protocol observations are welcome.
 - Stateless cutting blade toggle button.
 - Machine voltage, total mowing time, total charging time, firmware, estimated
   battery percentage, and minute-resolution current charging-time sensors.
-- Eleven identified diagnostic alarm sensors plus three explicitly unknown
-  alarm flags reserved for future protocol analysis.
+- Connectivity binary sensor showing whether the mower is responding, including
+  last-seen and consecutive-failure diagnostics.
+- Fourteen known alarm positions on newer firmware, while older 11-alarm
+  EGROBOT status responses are accepted and padded safely.
 - Inferred mowing, returning, docked, and active-charging status from one final
   state machine shared by the mower, Docked, and Charging entities.
 - Passive charger detection from sustained voltage behavior, including recovery
@@ -60,39 +86,54 @@ compatibility is not guaranteed. Reports and protocol observations are welcome.
 - Standalone tool for connecting a factory/AP-mode mower to a 2.4 GHz Wi-Fi network.
 - English default strings and Swedish translations.
 
+## Alarm compatibility
+
+Older EGROBOT applications V1.0.1/V4.2.2 use 11 alarm positions. Later firmware,
+including the physically tested Lyfco E1750 generation, uses 14. The integration
+accepts both layouts.
+
+The final three newer positions are mapped as:
+
+12. Wire signal lost
+13. Outside boundary
+14. Mower stuck
+
+Existing entity unique IDs are preserved during the rename, so upgrading does
+not create duplicate alarm entities.
+
 ## Important limitations
 
 - The mower status response does not directly report mowing, dock, rain, blade,
-  or battery state of charge. Beta.5 therefore treats absolute voltage values as
-  supporting context only. A single value such as 26.4 V cannot establish dock
-  state; docking requires a confirmed return context or a sustained charging
-  signature.
-- The estimated battery percentage is derived from the tested E1750 voltage
-  behavior. It currently maps 24.0 V to 5% and 29.0 V or higher to 100%, using
-  linear interpolation in between. It is not a battery-management-system SoC.
+  or battery state of charge. Absolute voltage values are supporting context
+  only; a single voltage cannot establish dock state.
+- Charging and battery-voltage behavior has been calibrated on the tested Lyfco
+  E1750/M10. Other EGROBOT models may use different battery packs or charging
+  voltages, so estimated battery percentage and inferred charging state require
+  additional physical validation on those models.
+- The estimated battery percentage currently maps 24.0 V to 5% and 29.0 V or
+  higher to 100%, with linear interpolation in between. It is not BMS SoC.
 - The mower's cumulative charging counter is reported only in whole hours. The
-  separate current charging-time sensor measures the currently inferred charging
-  phase in minutes from Home Assistant observations.
+  current charging-time sensor measures the currently inferred charging phase in
+  minutes from Home Assistant observations.
 - `Rain detected (inferred)` is not a physical wet-contact reading. It indicates
-  that a mower started through this integration returned to charging without a
-  home/stop command, low-battery indication, or another alarm. Schedule
-  completion or a physical-panel command can therefore cause an incorrect result.
-- A mower can return to charge by itself during an active schedule. Beta.5 can
-  recognize the resulting dock/charge state passively. Automatic resume after a
-  mid-schedule charge is not forced by Home Assistant; physical resume behavior
-  remains intentionally observational until it is verified on the mower.
+  a likely reason for an otherwise unexplained automatic return and can be wrong.
+- A mower can return to charge by itself during an active schedule. The current
+  state machine can recognize the dock/charge state passively. Home Assistant
+  does not force an automatic resume.
+- The tested mower was observed to resume scheduled work autonomously after a
+  mid-schedule charge, even after the nominal wall-clock schedule end. Correct
+  post-charge continuation inference is intentionally left for a later beta
+  because the mower is currently unavailable for physical testing.
 - The blade uses a toggle-only command (`Y8`) and the mower reports no blade
   state. It is therefore exposed as a stateless button rather than a switch.
 - The Android app contains no command for acknowledging or clearing alarms.
-  Alarms clear when the physical cause is removed and the mower updates its state.
 - PIN-protected control has not been implemented.
 - The mower firmware/app protocol provides no clock-read command, so clock sync
-  confirms successful transmission but cannot verify the displayed mower time.
+  confirms transmission but cannot verify the displayed mower time.
 - Miotlink `SearchAck` includes Wi-Fi credential fields in clear text. The
   integration extracts only model/firmware and never stores or logs the full response.
 - Working-area entities remain read-only. Schedules can be changed through a
-  validated action and are read back after every write. Extended data is
-  refreshed at most once every fifteen minutes after a complete read.
+  validated action and are read back after every write.
 
 ## Installation
 
@@ -107,7 +148,7 @@ compatibility is not guaranteed. Reports and protocol observations are welcome.
 
 2. Restart Home Assistant.
 3. Open **Settings → Devices & services → Add integration**.
-4. Search for **Lyfco Robot Mower**.
+4. Search for **EGROBOT Mower**.
 5. Enter the mower's reserved local IP address or hostname.
 
 The mower should have a DHCP reservation because the integration currently uses
@@ -117,12 +158,12 @@ the configured address as its unique identifier.
 
 1. Open HACS.
 2. Open the menu and select **Custom repositories**.
-3. Enter the GitHub repository URL.
+3. Enter this GitHub repository URL.
 4. Select category **Integration**.
-5. Install **Lyfco Robot Mower** and restart Home Assistant.
+5. Install **EGROBOT Mower** and restart Home Assistant.
 
-HACS can install from the default branch. GitHub Releases are optional but make
-version selection and upgrades clearer.
+The repository and integration domain remain named `ha-lyfco-mower` and
+`lyfco_mower` for backwards compatibility.
 
 ## Wi-Fi provisioning without the original app
 
@@ -163,43 +204,33 @@ Reserve the mower's new address in the router before adding it to Home Assistant
 
 Status is read using `W`; firmware is read using `V`. Working areas are read
 using `R`, and weekday schedules are read using `S0` through `S6` where day 0
-is Sunday. Each editable schedule row exposes edge mowing plus minutes for
-areas 1–6 as attributes.
+is Sunday. The known schedule format contains one start time per day plus six
+area-duration fields.
 
 ### Changing a schedule
 
 Open the mower's device page and select a weekday row. Enter a schedule in the
-format `HH:MM - HH:MM`, for example `13:47 - 15:47`. The duration must be in
-10-minute steps and can be at most 250 minutes when only area 1 is used. Edge
-mowing is preserved.
+format `HH:MM - HH:MM`. The duration must be in 10-minute steps and can be at
+most 250 minutes when only area 1 is used. Edge mowing is preserved.
 
 If a day uses several working areas, changing only the start time preserves all
-area durations. Changing the total duration is blocked because a single time
-range cannot describe how the new duration should be divided. For that advanced
-case, use **Developer tools → Actions → Lyfco Robot Mower: Set weekday schedule**.
+area durations. For advanced allocation, use **Developer tools → Actions →
+EGROBOT Mower: Set weekday schedule**.
 
 A schedule is written once and then read back up to three times. A temporary
 stale read-back therefore does not fail the edit immediately, while a persistent
-mismatch is still reported as an error and included in diagnostics.
+mismatch is reported as an error and included in diagnostics.
 
-Each weekday also has an **Edge mowing** switch on the device page. These are
-real synchronized switches: the current value comes from the mower schedule,
-and changing one preserves that day's start time and all six area durations.
-
-The **Rain sensor** switch reads its actual enabled/disabled setting from the
-mower. A change preserves all other `F` configuration fields and is accepted
-only after the integration has read the complete setting back from the mower.
-This switch controls whether the sensor is used; it does not indicate whether
-the sensor is currently wet.
+Each weekday also has an **Edge mowing** switch. The **Rain sensor** switch reads
+and writes the mower's actual enabled/disabled configuration while preserving
+all unrelated `F` settings.
 
 ### Clock synchronization
 
 The mower clock is set from Home Assistant's configured local time when the
-integration starts, at every new local date, and whenever the local UTC offset
-or time-zone identity changes. This explicitly covers transitions into and out
-of daylight-saving time. A failed automatic attempt is retried after five
-minutes. The device page also provides a manual **Synchronize mower clock**
-button.
+integration starts, on every new local date, and whenever the local UTC offset
+or time-zone identity changes. A failed automatic attempt is retried after five
+minutes. The device page also provides a manual **Synchronize mower clock** button.
 
 ## Troubleshooting
 
