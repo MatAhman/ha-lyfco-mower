@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect to Lyfco robot mower",
+        "title": "Connect to an EGROBOT-compatible robot mower",
         "description": "The mower must be connected to the same local network as Home Assistant.",
         "data": {"host": "IP address or hostname"}
       }
@@ -77,9 +77,9 @@
       "alarm_collision_sensor": {"name": "Collision sensor active"},
       "alarm_handle_sensor": {"name": "Handle sensor active"},
       "alarm_mower_tilted": {"name": "Mower tilted"},
-      "alarm_unknown_alarm_12": {"name": "Unknown alarm 12"},
-      "alarm_unknown_alarm_13": {"name": "Unknown alarm 13"},
-      "alarm_unknown_alarm_14": {"name": "Unknown alarm 14"}
+      "alarm_wire_signal_lost": {"name": "Wire signal lost"},
+      "alarm_outside_boundary": {"name": "Outside boundary"},
+      "alarm_mower_stuck": {"name": "Mower stuck"}
     },
     "button": {
       "start_auto": {"name": "Start automatically"},
