@@ -1,4 +1,4 @@
-"""Lyfco robot mower integration."""
+"""EGROBOT-compatible robot mower integration."""
 
 from __future__ import annotations
 
@@ -64,7 +64,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     async def async_set_schedule(call: ServiceCall) -> None:
         entry = hass.config_entries.async_get_entry(call.data["config_entry_id"])
         if entry is None or entry.domain != DOMAIN or not hasattr(entry, "runtime_data"):
-            raise HomeAssistantError("The selected Lyfco mower is not loaded")
+            raise HomeAssistantError("The selected EGROBOT mower is not loaded")
         start: time = call.data["start_time"]
         area_minutes = tuple(
             call.data[f"area_{number}_minutes"] for number in range(1, 7)
@@ -91,7 +91,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: LyfcoConfigEntry) -> bool:
-    """Set up Lyfco from a config entry."""
+    """Set up an EGROBOT-compatible mower from a config entry."""
     client = Beta5MowerClient(entry.data[CONF_HOST])
     coordinator = LyfcoCoordinator(hass, entry, client)
     await coordinator.async_load_persistent_state()
@@ -104,8 +104,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: LyfcoConfigEntry) -> boo
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, host)},
         name=DEFAULT_NAME,
-        manufacturer="Lyfco",
-        model=coordinator.data.model or "Robot mower (local LAN protocol)",
+        model=coordinator.data.model or "Robot mower (local EGROBOT/Miotlink protocol)",
         sw_version=coordinator.data.firmware,
     )
 
