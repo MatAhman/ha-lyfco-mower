@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Anslut till Lyfco robotgräsklippare",
+        "title": "Anslut till en EGROBOT-kompatibel robotgräsklippare",
         "description": "Klipparen måste vara ansluten till samma lokala nätverk som Home Assistant.",
         "data": {"host": "IP-adress eller värdnamn"}
       }
@@ -77,9 +77,9 @@
       "alarm_collision_sensor": {"name": "Kollisionssensor aktiverad"},
       "alarm_handle_sensor": {"name": "Handtagssensor aktiverad"},
       "alarm_mower_tilted": {"name": "Klipparen lutar för mycket"},
-      "alarm_unknown_alarm_12": {"name": "Okänt larm 12"},
-      "alarm_unknown_alarm_13": {"name": "Okänt larm 13"},
-      "alarm_unknown_alarm_14": {"name": "Okänt larm 14"}
+      "alarm_wire_signal_lost": {"name": "Trådsignal förlorad"},
+      "alarm_outside_boundary": {"name": "Utanför kanttråd"},
+      "alarm_mower_stuck": {"name": "Klipparen har fastnat"}
     },
     "button": {
       "start_auto": {"name": "Starta automatiskt"},
