@@ -1,11 +1,11 @@
-"""Constants for the Lyfco mower integration."""
+"""Constants for the EGROBOT-compatible mower integration."""
 
 from __future__ import annotations
 
 from datetime import timedelta
 
 DOMAIN = "lyfco_mower"
-DEFAULT_NAME = "Lyfco Robot Mower"
+DEFAULT_NAME = "EGROBOT Mower"
 DEFAULT_PORT = 9600
 POLL_INTERVAL = timedelta(seconds=30)
 
@@ -23,9 +23,9 @@ ALARM_KEYS = (
     "collision_sensor",
     "handle_sensor",
     "mower_tilted",
-    "unknown_alarm_12",
-    "unknown_alarm_13",
-    "unknown_alarm_14",
+    "wire_signal_lost",
+    "outside_boundary",
+    "mower_stuck",
 )
 
 # Preserve the entity unique IDs used by versions through 0.6.4. This lets an
@@ -47,11 +47,9 @@ ALARM_UNIQUE_KEYS = (
     "mower_stuck",
 )
 
-# Empirical voltage model for the e1750/M10 charging station.
-# 26.4 V remains the conservative level that proves charger contact after the
-# mower has first been seen below it when leaving the station. Once docked, the
-# mower repeatedly charges to about 30 V, backs off the contacts above 29.5 V,
-# lets the battery fall to about 28.6 V, then drives forward and charges again.
+# Empirical voltage model from the physically tested Lyfco E1750/M10 charging
+# station. These values are inference context, not generic hard thresholds for
+# every EGROBOT-compatible mower.
 CHARGING_VOLTAGE = 26.4
 CHARGE_BACKOFF_VOLTAGE = 29.5
 CHARGE_RECONNECT_VOLTAGE = 28.6
